@@ -1,0 +1,16 @@
+# Ignore Git metadata
+.git
+.gitignore
+
+# Ignore editor/IDE artifacts
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Ignore macOS artifacts
+.DS_Store
+
+# Ignore Go build cache (rebuilt inside container)
+bin/

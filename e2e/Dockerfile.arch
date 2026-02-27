@@ -1,0 +1,47 @@
+# Dockerfile.arch — E2E test image for gentleman-ai on Arch Linux
+# Builds the binary from source and runs the E2E test suite as a non-root user.
+FROM archlinux:base
+
+# ---------------------------------------------------------------------------
+# System dependencies
+# ---------------------------------------------------------------------------
+RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm \
+        git \
+        curl \
+        sudo \
+        go \
+        base-devel \
+    && pacman -Scc --noconfirm
+
+# ---------------------------------------------------------------------------
+# Create non-root test user with passwordless sudo
+# ---------------------------------------------------------------------------
+RUN useradd -m -s /bin/bash testuser && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# ---------------------------------------------------------------------------
+# Copy project source and build
+# ---------------------------------------------------------------------------
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -o /usr/local/bin/gentleman-ai ./cmd/gentleman-ai
+
+# ---------------------------------------------------------------------------
+# Prepare test environment
+# ---------------------------------------------------------------------------
+COPY e2e/lib.sh     /home/testuser/e2e/lib.sh
+COPY e2e/e2e_test.sh /home/testuser/e2e/e2e_test.sh
+RUN chmod +x /home/testuser/e2e/e2e_test.sh /home/testuser/e2e/lib.sh && \
+    chown -R testuser:testuser /home/testuser
+
+USER testuser
+WORKDIR /home/testuser
+
+# ---------------------------------------------------------------------------
+# Default: run Tier 1 tests only
+# ---------------------------------------------------------------------------
+CMD ["./e2e/e2e_test.sh"]
