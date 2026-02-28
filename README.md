@@ -1,6 +1,35 @@
+<![CDATA[<div align="center">
+
+```
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣴⣾⣿⡽⠟⠛⠻⣶⣄⠀⢀⣐⣒⣒⣶⣴⣾⡿⢷⣶⣽⡢⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡾⣿⣿⢿⠋⠀⠀⠀⠀⠀⠉⠛⠓⠒⠛⠚⠛⠉⣿⠀⠀⣧⡏⠻⣷⣽⡦⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣻⡾⠋⣇⢸⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠁⠀⠀⠉⠀⠀⢸⠙⠻⣿⣷⣶⣄⡀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⣠⣶⣿⠋⠈⠀⠛⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀⠉⠀⠀⠈⡿⣷⣽⣇⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⢀⣞⡿⠟⣟⠀⠀⠀⠀⠀⠀⠀⠀⠸⡆⠀⠀⠀⣆⠀⠀⡀⢸⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠁⠈⠻⣯⡳⣄⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⢀⣽⠟⠁⠀⠘⠃⠀⠀⠀⠀⢰⡀⠀⠀⢹⡀⠀⠀⢸⡄⢀⣇⡾⣠⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢻⣾⣅⠀⠀⠀⠀
+⣀⣀⣠⡴⠿⣅⠐⢦⡀⠀⠀⠀⠲⣄⠀⠀⣙⣦⣶⣾⣻⣶⣶⠾⠿⠾⢿⣿⣿⣻⢷⣢⢤⣀⠀⠀⠀⠀⠀⠀⠀⡀⠀⣴⠛⣿⣷⣄⡀⠀
+⠹⠿⢿⣷⣦⣼⣷⣤⣻⣶⣤⣀⣀⣬⣷⡯⠷⠾⢿⣿⣭⣄⣀⣀⣀⣀⣀⣤⣭⡿⠿⢾⣿⣿⣿⣦⣤⣤⣤⣶⢾⡷⣿⣷⣾⣷⣿⡿⠿⠟
+⠀⠀⠘⣿⡝⣿⡿⢻⣿⡿⢩⡞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠉⠀⠀⠀⠀⠀⠀⠀⠀⠰⡄⠀⠀⠀⠀⠘⢦⠹⣮⢷⠹⣷⣿⠀⠀⠀
+⠀⠀⠀⠙⣷⣿⠁⡞⣾⠀⡞⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣤⡇⠀⠀⠀⠀⠀⢸⡆⢸⢸⣦⡟⠁⠀⠀⠀
+⠀⠀⠀⠀⠈⢻⣄⡏⣿⠀⡇⠀⠀⠀⠀⠀⢰⠀⠀⠀⠀⠀⠀⠀⢐⣧⠀⠀⠀⠀⠀⠀⠀⠈⠁⠀⠀⠀⠀⠀⣼⡇⠘⣼⠏⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠙⠻⣧⣧⢣⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠸⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⢹⣠⡾⠃⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⢿⣧⡘⣆⠀⠀⠘⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠀⠀⣴⣷⣿⡋⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⠷⣤⣀⣹⣄⠀⠀⠀⠀⠀⠀⡇⠀⠀⢀⠀⡆⠀⠀⣀⣴⣧⣴⣟⠯⠛⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠽⠿⠿⠷⠶⢤⣤⣴⣿⣦⣶⣾⣿⣷⣾⣻⣿⠝⠛⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠉⠉⠉⠛⠛⠛⠛⠛⠊⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+```
+
 # AI Gentle Stack
 
-> **One command. Any agent. Any OS. The Gentleman AI ecosystem -- configured and ready.**
+**One command. Any agent. Any OS. The Gentleman AI ecosystem -- configured and ready.**
+
+[![Release](https://img.shields.io/github/v/release/Gentleman-Programming/gentleman-ai-installer)](https://github.com/Gentleman-Programming/gentleman-ai-installer/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+</div>
+
+---
 
 AI Gentle Stack takes whatever AI coding agent(s) you use and supercharges them with the Gentleman ecosystem: persistent memory, spec-driven development, coding skills, MCP servers, code review, and a teaching-oriented persona.
 
@@ -19,6 +48,49 @@ This is NOT an AI agent installer. Most agents are easy to install. This is an *
 
 **After**: Your agent now has memory, skills, workflow, MCP tools, and a persona that actually teaches you.
 
+## Install
+
+### Homebrew (macOS)
+
+```bash
+brew tap Gentleman-Programming/homebrew-tap
+brew install gentleman-ai
+```
+
+### Go install (any platform)
+
+```bash
+go install github.com/gentleman-programming/gentleman-ai-installer/cmd/gentleman-ai@latest
+```
+
+### From releases
+
+Download the binary for your platform from [GitHub Releases](https://github.com/Gentleman-Programming/gentleman-ai-installer/releases).
+
+## Usage
+
+### Interactive TUI
+
+Just run it -- the interactive TUI guides you through everything:
+
+```bash
+gentleman-ai
+```
+
+### CLI mode
+
+```bash
+# Full ecosystem for both agents
+gentleman-ai install \
+  --agent claude-code,opencode \
+  --preset full-gentleman
+
+# Dry-run first (see what would happen)
+gentleman-ai install --dry-run \
+  --agent claude-code,opencode \
+  --component engram,sdd,skills,context7,persona,permissions
+```
+
 ## Supported platforms
 
 | Platform | Package Manager | Status |
@@ -28,8 +100,6 @@ This is NOT an AI agent installer. Most agents are easy to install. This is an *
 | Linux (Arch) | pacman | Supported |
 
 Derivatives are detected via `ID_LIKE` in `/etc/os-release` (Linux Mint, Pop!_OS, Manjaro, EndeavourOS, etc.).
-
-Unsupported platforms are rejected at startup with a clear error message.
 
 ## Supported agents
 
@@ -50,33 +120,6 @@ Unsupported platforms are rejected at startup with a clear error message.
 | `permissions` | Security-first defaults (blocks .env access) |
 | `gga` | Guardian Angel code review (optional) |
 
-## Quick start
-
-### Prerequisites
-
-- Go 1.22+
-- `git` in PATH
-- Platform-specific:
-  - **macOS**: Homebrew
-  - **Ubuntu/Debian**: `apt-get`, `sudo`
-  - **Arch**: `pacman`, `sudo`
-
-### Dry run (see what would happen)
-
-```bash
-go run ./cmd/gentleman-ai install --dry-run \
-  --agent claude-code,opencode \
-  --component engram,sdd,skills,context7,persona,permissions
-```
-
-### Install
-
-```bash
-go run ./cmd/gentleman-ai install \
-  --agent claude-code,opencode \
-  --preset full-gentleman
-```
-
 ## CLI flags
 
 | Flag | Description |
@@ -87,6 +130,7 @@ go run ./cmd/gentleman-ai install \
 | `--persona` | Persona: `gentleman`, `neutral`, `custom` |
 | `--preset` | Preset: `full-gentleman`, `ecosystem-only`, `minimal`, `custom` |
 | `--dry-run` | Preview plan without applying changes |
+| `--version`, `-v` | Print version |
 
 ## Architecture
 
@@ -97,7 +141,7 @@ internal/
   system/                  OS/distro detection, platform profiles, support guards
   cli/                     Install flags, validation, orchestration, dry-run
   planner/                 Dependency graph, resolution, ordering, review payloads
-  installcmd/              Profile-aware command resolver (brew/apt/pacman)
+  installcmd/              Profile-aware command resolver (brew/apt/pacman/go install)
   pipeline/                Staged execution + rollback orchestration
   backup/                  Config snapshot + restore
   components/              Per-component install/inject logic
@@ -109,28 +153,20 @@ internal/
     styles/  screens/
 e2e/                       Docker-based E2E tests (Ubuntu + Arch)
 testdata/                  Golden test fixtures
-docs/                      Additional documentation
 ```
 
 ## Testing
 
 ```bash
-# Run all tests
+# Unit tests (27 packages)
 go test ./...
 
+# Docker E2E (Ubuntu + Arch, requires Docker)
+RUN_FULL_E2E=1 RUN_BACKUP_TESTS=1 ./e2e/docker-test.sh
+
 # Dry-run smoke test
-go run ./cmd/gentleman-ai install --dry-run
-
-# Docker E2E (requires Docker)
-cd e2e && ./docker-test.sh
+gentleman-ai install --dry-run
 ```
-
-## Documentation
-
-- [Quick Start](docs/quickstart.md)
-- [Non-Interactive Mode](docs/non-interactive.md)
-- [Backup & Rollback](docs/rollback.md)
-- [Docker E2E Testing](docs/docker-e2e-testing.md)
 
 ## Relationship to Gentleman.Dots
 
@@ -145,3 +181,4 @@ Install Gentleman.Dots first for your dev environment, then AI Gentle Stack for 
 ## License
 
 MIT
+]]>
