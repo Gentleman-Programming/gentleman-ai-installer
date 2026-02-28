@@ -52,12 +52,12 @@ func (a *Adapter) InstallCommand(_ system.PlatformProfile) ([][]string, error) {
 }
 
 // --- Config paths ---
-// VS Code ecosystem: Copilot reads ~/.github/copilot-instructions.md for system
-// instructions. Skills and MCP config go under ~/.vscode/ so that any AI extension
-// (Copilot, Claude extension, Codex, Roo, etc.) can benefit from them.
+// VS Code Copilot reads ~/.github/copilot-instructions.md for system instructions.
+// Skills are loaded from ~/.copilot/skills/ (global), .github/skills/ (workspace),
+// ~/.claude/skills/, and .claude/skills/. We target ~/.copilot/skills/ for global reach.
 
 func (a *Adapter) GlobalConfigDir(homeDir string) string {
-	return filepath.Join(homeDir, ".vscode")
+	return filepath.Join(homeDir, ".copilot")
 }
 
 func (a *Adapter) SystemPromptFile(homeDir string) string {
@@ -66,8 +66,8 @@ func (a *Adapter) SystemPromptFile(homeDir string) string {
 }
 
 func (a *Adapter) SkillsDir(homeDir string) string {
-	// Skills under ~/.vscode/skills/ — available to any VS Code AI extension.
-	return filepath.Join(homeDir, ".vscode", "skills")
+	// Skills under ~/.copilot/skills/ — VS Code Copilot global skills directory.
+	return filepath.Join(homeDir, ".copilot", "skills")
 }
 
 func (a *Adapter) SettingsPath(homeDir string) string {
@@ -88,6 +88,7 @@ func (a *Adapter) MCPStrategy() model.MCPStrategy {
 // --- MCP ---
 
 func (a *Adapter) MCPConfigPath(homeDir string, _ string) string {
+	// MCP stays in .vscode/settings.json — this is the VS Code settings path.
 	return filepath.Join(homeDir, ".vscode", "settings.json")
 }
 

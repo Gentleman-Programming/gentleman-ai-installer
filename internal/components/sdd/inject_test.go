@@ -259,8 +259,8 @@ func TestInjectVSCodeWritesSDDOrchestratorAndSkills(t *testing.T) {
 		t.Fatal("VS Code system prompt missing SDD orchestrator content")
 	}
 
-	// Should also write SDD skill files under ~/.vscode/skills/.
-	skillPath := filepath.Join(home, ".vscode", "skills", "sdd-init", "SKILL.md")
+	// Should also write SDD skill files under ~/.copilot/skills/.
+	skillPath := filepath.Join(home, ".copilot", "skills", "sdd-init", "SKILL.md")
 	if _, err := os.Stat(skillPath); err != nil {
 		t.Fatalf("expected SDD skill file %q: %v", skillPath, err)
 	}

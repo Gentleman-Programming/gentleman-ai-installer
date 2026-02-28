@@ -166,7 +166,7 @@ func TestInjectVSCodeWritesSkillFiles(t *testing.T) {
 		t.Fatalf("Inject(vscode) files len = %d, want 1", len(result.Files))
 	}
 
-	path := filepath.Join(home, ".vscode", "skills", "typescript", "SKILL.md")
+	path := filepath.Join(home, ".copilot", "skills", "typescript", "SKILL.md")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("expected skill file %q: %v", path, err)
 	}
