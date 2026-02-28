@@ -88,8 +88,8 @@ detect_platform() {
     uname_arch="$(uname -m)"
 
     case "$uname_os" in
-        Darwin) OS="darwin"; OS_LABEL="macOS"; GORELEASER_OS="Darwin" ;;
-        Linux)  OS="linux";  OS_LABEL="Linux"; GORELEASER_OS="Linux" ;;
+        Darwin) OS="darwin"; OS_LABEL="macOS"; GORELEASER_OS="darwin" ;;
+        Linux)  OS="linux";  OS_LABEL="Linux"; GORELEASER_OS="linux" ;;
         *)      fatal "Unsupported OS: $uname_os. Only macOS and Linux are supported." ;;
     esac
 
@@ -108,11 +108,11 @@ detect_platform() {
 # From .goreleaser.yaml:
 #   name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 #
-# GoReleaser {{ .Os }} produces title-cased values (Darwin, Linux)
+# GoReleaser v2 {{ .Os }} produces GOOS values (lowercase: darwin, linux)
 # GoReleaser {{ .Arch }} produces GOARCH values (amd64, arm64)
 # Examples:
-#   gentle-ai_1.0.0_Darwin_arm64.tar.gz
-#   gentle-ai_1.0.0_Linux_amd64.tar.gz
+#   gentle-ai_1.0.0_darwin_arm64.tar.gz
+#   gentle-ai_1.0.0_linux_amd64.tar.gz
 # ============================================================================
 
 get_archive_name() {
@@ -277,7 +277,7 @@ install_binary() {
 
     # Download archive
     info "Downloading ${archive_name}..."
-    if ! curl -sL -o "${tmpdir}/${archive_name}" "$download_url"; then
+    if ! curl -sfL -o "${tmpdir}/${archive_name}" "$download_url"; then
         fatal "Failed to download ${download_url}"
     fi
 
@@ -294,7 +294,7 @@ install_binary() {
     info "Verifying checksum..."
     if curl -sL -o "${tmpdir}/checksums.txt" "$checksums_url"; then
         local expected_checksum
-        expected_checksum="$(grep "${archive_name}" "${tmpdir}/checksums.txt" | awk '{print $1}')"
+        expected_checksum="$(grep "${archive_name}" "${tmpdir}/checksums.txt" 2>/dev/null | awk '{print $1}' || true)"
 
         if [ -n "$expected_checksum" ]; then
             local actual_checksum
