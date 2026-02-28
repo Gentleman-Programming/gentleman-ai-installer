@@ -1,5 +1,5 @@
 # Binaries
-gentleman-ai
+/gentleman-ai
 *.exe
 *.dll
 *.so
