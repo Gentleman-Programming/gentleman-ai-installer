@@ -24,6 +24,9 @@ var defaultEngramOverlayJSON = []byte("{\n  \"mcpServers\": {\n    \"engram\": {
 // openCodeEngramOverlayJSON is the opencode.json overlay using the new MCP format.
 var openCodeEngramOverlayJSON = []byte("{\n  \"mcp\": {\n    \"engram\": {\n      \"command\": [\"engram\", \"mcp\"],\n      \"enabled\": true,\n      \"type\": \"local\"\n    }\n  }\n}\n")
 
+// vsCodeEngramOverlayJSON is the VS Code mcp.json overlay using the "servers" key.
+var vsCodeEngramOverlayJSON = []byte("{\n  \"servers\": {\n    \"engram\": {\n      \"command\": \"engram\",\n      \"args\": [\"mcp\"]\n    }\n  }\n}\n")
+
 func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 	if !adapter.SupportsMCP() {
 		return InjectionResult{}, nil
@@ -64,7 +67,12 @@ func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 		if mcpPath == "" {
 			break
 		}
-		mcpWrite, err := mergeJSONFile(mcpPath, defaultEngramOverlayJSON)
+		overlay := defaultEngramOverlayJSON
+		if adapter.Agent() == model.AgentVSCodeCopilot {
+			overlay = vsCodeEngramOverlayJSON
+		}
+
+		mcpWrite, err := mergeJSONFile(mcpPath, overlay)
 		if err != nil {
 			return InjectionResult{}, err
 		}

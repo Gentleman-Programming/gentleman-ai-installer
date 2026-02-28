@@ -2,8 +2,10 @@ package vscode
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/gentleman-programming/gentle-ai/internal/model"
 	"github.com/gentleman-programming/gentle-ai/internal/system"
@@ -52,7 +54,7 @@ func (a *Adapter) InstallCommand(_ system.PlatformProfile) ([][]string, error) {
 }
 
 // --- Config paths ---
-// VS Code Copilot reads ~/.github/copilot-instructions.md for system instructions.
+// VS Code Copilot reads .instructions.md files from the VS Code User prompts folder.
 // Skills are loaded from ~/.copilot/skills/ (global), .github/skills/ (workspace),
 // ~/.claude/skills/, and .claude/skills/. We target ~/.copilot/skills/ for global reach.
 
@@ -60,9 +62,12 @@ func (a *Adapter) GlobalConfigDir(homeDir string) string {
 	return filepath.Join(homeDir, ".copilot")
 }
 
+func (a *Adapter) SystemPromptDir(homeDir string) string {
+	return filepath.Join(a.vscodeUserDir(homeDir), "prompts")
+}
+
 func (a *Adapter) SystemPromptFile(homeDir string) string {
-	// Global instructions path — VS Code Copilot reads ~/.github/copilot-instructions.md
-	return filepath.Join(homeDir, ".github", "copilot-instructions.md")
+	return filepath.Join(a.SystemPromptDir(homeDir), "gentle-ai.instructions.md")
 }
 
 func (a *Adapter) SkillsDir(homeDir string) string {
@@ -71,25 +76,37 @@ func (a *Adapter) SkillsDir(homeDir string) string {
 }
 
 func (a *Adapter) SettingsPath(homeDir string) string {
-	// MCP settings for VS Code AI extensions.
+	// Keep settings path for non-MCP overlays if needed.
 	return filepath.Join(homeDir, ".vscode", "settings.json")
 }
 
 // --- Config strategies ---
 
 func (a *Adapter) SystemPromptStrategy() model.SystemPromptStrategy {
-	return model.StrategyFileReplace
+	return model.StrategyInstructionsFile
 }
 
 func (a *Adapter) MCPStrategy() model.MCPStrategy {
-	return model.StrategyMergeIntoSettings
+	return model.StrategyMCPConfigFile
 }
 
 // --- MCP ---
 
 func (a *Adapter) MCPConfigPath(homeDir string, _ string) string {
-	// MCP stays in .vscode/settings.json — this is the VS Code settings path.
-	return filepath.Join(homeDir, ".vscode", "settings.json")
+	return filepath.Join(a.vscodeUserDir(homeDir), "mcp.json")
+}
+
+func (a *Adapter) vscodeUserDir(homeDir string) string {
+	if runtime.GOOS == "darwin" {
+		return filepath.Join(homeDir, "Library", "Application Support", "Code", "User")
+	}
+
+	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
+	if xdgConfigHome == "" {
+		xdgConfigHome = filepath.Join(homeDir, ".config")
+	}
+
+	return filepath.Join(xdgConfigHome, "Code", "User")
 }
 
 // --- Optional capabilities ---

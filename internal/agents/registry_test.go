@@ -22,6 +22,7 @@ func (m mockAdapter) Detect(_ context.Context, _ string) (bool, string, string, 
 }
 func (m mockAdapter) InstallCommand(system.PlatformProfile) ([][]string, error) { return nil, nil }
 func (m mockAdapter) GlobalConfigDir(_ string) string                           { return "" }
+func (m mockAdapter) SystemPromptDir(_ string) string                           { return "" }
 func (m mockAdapter) SystemPromptFile(_ string) string                          { return "" }
 func (m mockAdapter) SkillsDir(_ string) string                                 { return "" }
 func (m mockAdapter) SettingsPath(_ string) string                              { return "" }

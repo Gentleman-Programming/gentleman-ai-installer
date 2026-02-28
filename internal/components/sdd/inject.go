@@ -36,7 +36,7 @@ func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 		changed = changed || result.Changed
 		files = append(files, result.Files...)
 
-	case model.StrategyFileReplace, model.StrategyAppendToFile:
+	case model.StrategyFileReplace, model.StrategyAppendToFile, model.StrategyInstructionsFile:
 		// For FileReplace/AppendToFile agents, the SDD orchestrator is included
 		// in the generic persona asset. However, if the user chose neutral or
 		// custom persona, the SDD content must still be injected. We append the
@@ -126,6 +126,10 @@ func injectFileAppend(homeDir string, adapter agents.Adapter) (InjectionResult, 
 		return InjectionResult{Files: []string{promptPath}}, nil
 	}
 
+	if adapter.SystemPromptStrategy() == model.StrategyInstructionsFile && strings.TrimSpace(existing) == "" {
+		existing = instructionsFrontmatter
+	}
+
 	// Use generic SDD orchestrator content suitable for any agent.
 	content := assets.MustRead("generic/sdd-orchestrator.md")
 
@@ -145,6 +149,12 @@ func injectFileAppend(homeDir string, adapter agents.Adapter) (InjectionResult, 
 
 	return InjectionResult{Changed: writeResult.Changed, Files: []string{promptPath}}, nil
 }
+
+const instructionsFrontmatter = "---\n" +
+	"name: Gentle AI Persona\n" +
+	"description: Gentleman persona with SDD orchestration and Engram protocol\n" +
+	"applyTo: \"**\"\n" +
+	"---\n"
 
 func injectMarkdownSections(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 	promptPath := adapter.SystemPromptFile(homeDir)

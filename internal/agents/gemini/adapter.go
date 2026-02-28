@@ -76,6 +76,10 @@ func (a *Adapter) GlobalConfigDir(homeDir string) string {
 	return filepath.Join(homeDir, ".gemini")
 }
 
+func (a *Adapter) SystemPromptDir(homeDir string) string {
+	return filepath.Join(homeDir, ".gemini")
+}
+
 func (a *Adapter) SystemPromptFile(homeDir string) string {
 	return filepath.Join(homeDir, ".gemini", "GEMINI.md")
 }

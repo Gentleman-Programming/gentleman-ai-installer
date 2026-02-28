@@ -9,6 +9,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
 	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/vscode"
 )
 
 func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
@@ -170,5 +171,38 @@ func TestInjectCursorMergesEngramToSettings(t *testing.T) {
 	// Cursor uses MCPConfigFile strategy — engram gets merged into mcp.json.
 	if !result.Changed {
 		t.Fatalf("Inject(cursor) changed = false")
+	}
+}
+
+func TestInjectVSCodeMergesEngramToMCPConfigFile(t *testing.T) {
+	home := t.TempDir()
+	adapter := vscode.NewAdapter()
+
+	result, err := Inject(home, adapter)
+	if err != nil {
+		t.Fatalf("Inject(vscode) error = %v", err)
+	}
+	if !result.Changed {
+		t.Fatalf("Inject(vscode) changed = false")
+	}
+
+	mcpPath := adapter.MCPConfigPath(home, "engram")
+	content, err := os.ReadFile(mcpPath)
+	if err != nil {
+		t.Fatalf("ReadFile(mcp.json) error = %v", err)
+	}
+
+	text := string(content)
+	if !strings.Contains(text, `"servers"`) {
+		t.Fatal("mcp.json missing servers key")
+	}
+	if !strings.Contains(text, `"engram"`) {
+		t.Fatal("mcp.json missing engram server")
+	}
+	if !strings.Contains(text, `"mcp"`) {
+		t.Fatal("mcp.json missing engram args mcp")
+	}
+	if strings.Contains(text, `"mcpServers"`) {
+		t.Fatal("mcp.json should use 'servers' key, not 'mcpServers'")
 	}
 }

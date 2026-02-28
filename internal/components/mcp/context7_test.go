@@ -18,3 +18,13 @@ func TestDefaultContext7OverlayJSONIncludesServerName(t *testing.T) {
 		t.Fatalf("DefaultContext7OverlayJSON() does not include context7 server")
 	}
 }
+
+func TestVSCodeContext7OverlayUsesServersKey(t *testing.T) {
+	content := VSCodeContext7OverlayJSON()
+	if !bytes.Contains(content, []byte(`"servers"`)) {
+		t.Fatalf("VSCodeContext7OverlayJSON() should include servers key")
+	}
+	if bytes.Contains(content, []byte(`"mcpServers"`)) {
+		t.Fatalf("VSCodeContext7OverlayJSON() should not include mcpServers key")
+	}
+}

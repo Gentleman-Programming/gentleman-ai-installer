@@ -1,0 +1,56 @@
+package vscode
+
+import (
+	"path/filepath"
+	"runtime"
+	"testing"
+
+	"github.com/gentleman-programming/gentle-ai/internal/model"
+)
+
+func TestStrategies(t *testing.T) {
+	a := NewAdapter()
+
+	if got := a.SystemPromptStrategy(); got != model.StrategyInstructionsFile {
+		t.Fatalf("SystemPromptStrategy() = %v, want %v", got, model.StrategyInstructionsFile)
+	}
+
+	if got := a.MCPStrategy(); got != model.StrategyMCPConfigFile {
+		t.Fatalf("MCPStrategy() = %v, want %v", got, model.StrategyMCPConfigFile)
+	}
+}
+
+func TestSystemPromptFileUsesInstructionsExtension(t *testing.T) {
+	a := NewAdapter()
+	home := "/tmp/home"
+
+	path := a.SystemPromptFile(home)
+	if filepath.Ext(path) != ".md" {
+		t.Fatalf("SystemPromptFile() should end with .md: %q", path)
+	}
+
+	if filepath.Base(path) != "gentle-ai.instructions.md" {
+		t.Fatalf("SystemPromptFile() = %q, want filename gentle-ai.instructions.md", path)
+	}
+}
+
+func TestMCPConfigPathUsesVSCodeUserProfile(t *testing.T) {
+	a := NewAdapter()
+	home := "/tmp/home"
+
+	if runtime.GOOS != "darwin" {
+		t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg"))
+		path := a.MCPConfigPath(home, "context7")
+		want := filepath.Join(home, "xdg", "Code", "User", "mcp.json")
+		if path != want {
+			t.Fatalf("MCPConfigPath() = %q, want %q", path, want)
+		}
+		return
+	}
+
+	path := a.MCPConfigPath(home, "context7")
+	want := filepath.Join(home, "Library", "Application Support", "Code", "User", "mcp.json")
+	if path != want {
+		t.Fatalf("MCPConfigPath() = %q, want %q", path, want)
+	}
+}

@@ -80,6 +80,10 @@ func (a *Adapter) GlobalConfigDir(homeDir string) string {
 	return filepath.Join(homeDir, ".config", "opencode")
 }
 
+func (a *Adapter) SystemPromptDir(homeDir string) string {
+	return filepath.Join(homeDir, ".config", "opencode")
+}
+
 func (a *Adapter) SystemPromptFile(homeDir string) string {
 	return filepath.Join(homeDir, ".config", "opencode", "AGENTS.md")
 }

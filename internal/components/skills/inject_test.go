@@ -116,6 +116,7 @@ func (a noSkillsAdapter) InstallCommand(_ system.PlatformProfile) ([][]string, e
 	return nil, nil
 }
 func (a noSkillsAdapter) GlobalConfigDir(_ string) string  { return "" }
+func (a noSkillsAdapter) SystemPromptDir(_ string) string  { return "" }
 func (a noSkillsAdapter) SystemPromptFile(_ string) string { return "" }
 func (a noSkillsAdapter) SkillsDir(_ string) string        { return "" }
 func (a noSkillsAdapter) SettingsPath(_ string) string     { return "" }

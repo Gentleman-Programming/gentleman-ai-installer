@@ -70,6 +70,16 @@ func Inject(homeDir string, adapter agents.Adapter, persona model.PersonaID) (In
 		changed = changed || writeResult.Changed
 		files = append(files, promptPath)
 
+	case model.StrategyInstructionsFile:
+		promptPath := adapter.SystemPromptFile(homeDir)
+		instructionsContent := wrapInstructionsFile(content)
+		writeResult, err := filemerge.WriteFileAtomic(promptPath, []byte(instructionsContent), 0o644)
+		if err != nil {
+			return InjectionResult{}, err
+		}
+		changed = changed || writeResult.Changed
+		files = append(files, promptPath)
+
 	case model.StrategyAppendToFile:
 		promptPath := adapter.SystemPromptFile(homeDir)
 		writeResult, err := filemerge.WriteFileAtomic(promptPath, []byte(content), 0o644)
@@ -179,4 +189,14 @@ func readFileOrEmpty(path string) (string, error) {
 		return "", fmt.Errorf("read file %q: %w", path, err)
 	}
 	return string(data), nil
+}
+
+func wrapInstructionsFile(content string) string {
+	frontmatter := "---\n" +
+		"name: Gentle AI Persona\n" +
+		"description: Gentleman persona with SDD orchestration and Engram protocol\n" +
+		"applyTo: \"**\"\n" +
+		"---\n\n"
+
+	return frontmatter + content
 }

@@ -247,8 +247,8 @@ func TestInjectVSCodeWritesSDDOrchestratorAndSkills(t *testing.T) {
 		t.Fatal("Inject(vscode) changed = false")
 	}
 
-	// Verify SDD orchestrator was injected into copilot-instructions.md.
-	promptPath := filepath.Join(home, ".github", "copilot-instructions.md")
+	// Verify SDD orchestrator was injected into the VS Code instructions file.
+	promptPath := vscodeAdapter.SystemPromptFile(home)
 	content, readErr := os.ReadFile(promptPath)
 	if readErr != nil {
 		t.Fatalf("ReadFile(%q) error = %v", promptPath, readErr)

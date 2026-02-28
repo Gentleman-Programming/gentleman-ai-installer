@@ -8,6 +8,9 @@ var defaultContext7OverlayJSON = []byte("{\n  \"mcpServers\": {\n    \"context7\
 // Context7 is a remote MCP server — no npx needed.
 var openCodeContext7OverlayJSON = []byte("{\n  \"mcp\": {\n    \"context7\": {\n      \"type\": \"remote\",\n      \"url\": \"https://mcp.context7.com/mcp\",\n      \"enabled\": true\n    }\n  }\n}\n")
 
+// vsCodeContext7OverlayJSON is the VS Code mcp.json overlay using the "servers" key.
+var vsCodeContext7OverlayJSON = []byte("{\n  \"servers\": {\n    \"context7\": {\n      \"type\": \"http\",\n      \"url\": \"https://mcp.context7.com/mcp\"\n    }\n  }\n}\n")
+
 func DefaultContext7ServerJSON() []byte {
 	content := make([]byte, len(defaultContext7ServerJSON))
 	copy(content, defaultContext7ServerJSON)
@@ -23,5 +26,11 @@ func DefaultContext7OverlayJSON() []byte {
 func OpenCodeContext7OverlayJSON() []byte {
 	content := make([]byte, len(openCodeContext7OverlayJSON))
 	copy(content, openCodeContext7OverlayJSON)
+	return content
+}
+
+func VSCodeContext7OverlayJSON() []byte {
+	content := make([]byte, len(vsCodeContext7OverlayJSON))
+	copy(content, vsCodeContext7OverlayJSON)
 	return content
 }

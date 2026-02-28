@@ -68,6 +68,10 @@ func (a *Adapter) GlobalConfigDir(homeDir string) string {
 	return filepath.Join(homeDir, ".cursor")
 }
 
+func (a *Adapter) SystemPromptDir(homeDir string) string {
+	return filepath.Join(homeDir, ".cursor", "rules")
+}
+
 func (a *Adapter) SystemPromptFile(homeDir string) string {
 	return filepath.Join(homeDir, ".cursor", "rules", "gentle-ai.mdc")
 }

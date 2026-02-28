@@ -31,6 +31,7 @@ type Adapter interface {
 
 	// Config paths — components use these instead of hardcoding paths per agent.
 	GlobalConfigDir(homeDir string) string
+	SystemPromptDir(homeDir string) string
 	SystemPromptFile(homeDir string) string
 	SkillsDir(homeDir string) string
 	SettingsPath(homeDir string) string

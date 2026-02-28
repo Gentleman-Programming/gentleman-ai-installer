@@ -362,7 +362,7 @@ func TestInjectGeminiGentlemanWritesSystemPromptWithRealContent(t *testing.T) {
 	}
 }
 
-func TestInjectVSCodeGentlemanWritesCopilotInstructions(t *testing.T) {
+func TestInjectVSCodeGentlemanWritesInstructionsFile(t *testing.T) {
 	home := t.TempDir()
 
 	vscodeAdapter, err := agents.NewAdapter("vscode-copilot")
@@ -379,13 +379,16 @@ func TestInjectVSCodeGentlemanWritesCopilotInstructions(t *testing.T) {
 		t.Fatal("Inject(vscode, gentleman) changed = false")
 	}
 
-	path := filepath.Join(home, ".github", "copilot-instructions.md")
+	path := vscodeAdapter.SystemPromptFile(home)
 	content, readErr := os.ReadFile(path)
 	if readErr != nil {
 		t.Fatalf("ReadFile(%q) error = %v", path, readErr)
 	}
 
 	text := string(content)
+	if !strings.Contains(text, "applyTo: \"**\"") {
+		t.Fatal("VS Code instructions file missing YAML frontmatter applyTo pattern")
+	}
 	if !strings.Contains(text, "Senior Architect") {
 		t.Fatal("VS Code persona missing 'Senior Architect'")
 	}
