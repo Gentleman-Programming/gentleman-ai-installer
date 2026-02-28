@@ -22,6 +22,9 @@
 
 <h1>AI Gentle Stack</h1>
 
+> [!WARNING]
+> **DO NOT use this repository yet.** It is a work in progress and is NOT ready for use. Things will break, APIs will change, and nothing is guaranteed to work. Stay tuned for the official release.
+
 <p><strong>One command. Any agent. Any OS. The Gentleman AI ecosystem -- configured and ready.</strong></p>
 
 <p>
