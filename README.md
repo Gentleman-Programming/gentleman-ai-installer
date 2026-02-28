@@ -111,7 +111,7 @@ Download the binary for your platform from [GitHub Releases](https://github.com/
 | OpenCode | `opencode` | Yes | Yes | Yes | No | Yes | `~/.config/opencode` |
 | Gemini CLI | `gemini-cli` | Yes | Yes | Yes (experimental) | No | No | `~/.gemini` |
 | Cursor | `cursor` | Yes | Yes | Yes | No | No | `~/.cursor` |
-| VS Code Copilot | `vscode-copilot` | Yes | Yes | Yes | No | No | `~/.github` + `~/.vscode` |
+| VS Code Copilot | `vscode-copilot` | Yes | Yes | Yes | No | No | `~/.github` + `~/.copilot` |
 
 All agents receive the **full SDD orchestrator** (agent-teams-lite) injected into their system prompt, plus skill files written to their skills directory. Every agent supports sub-agent delegation natively, enabling the full SDD orchestration workflow with parallel sub-agents.
 
@@ -122,7 +122,7 @@ All agents receive the **full SDD orchestrator** (agent-teams-lite) injected int
 - **VS Code Copilot** uses the `runSubagent` tool with support for parallel execution and custom agent definitions.
 - **Output Styles** are currently a Claude Code exclusive feature (`~/.claude/output-styles/`).
 - **Slash Commands** are supported by Claude Code and OpenCode only.
-- **VS Code Copilot** stores skills and MCP config under `~/.vscode/` so any AI extension (Copilot, Claude extension, Codex, Roo, etc.) can benefit from them.
+- **VS Code Copilot** stores skills under `~/.copilot/skills/` (global) and MCP config under `~/.github/` so any AI extension can benefit from them.
 
 ---
 

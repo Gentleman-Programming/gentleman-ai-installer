@@ -96,14 +96,14 @@ func TestInstallCommand(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "darwin resolves brew tap and install",
+			name:    "darwin resolves official anomalyco brew tap",
 			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
-			want:    [][]string{{"brew", "tap", "Gentleman-Programming/homebrew-tap"}, {"brew", "install", "opencode"}},
+			want:    [][]string{{"brew", "install", "anomalyco/tap/opencode"}},
 		},
 		{
-			name:    "ubuntu resolves go install command with CGO_ENABLED=0",
+			name:    "ubuntu resolves npm install",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
-			want:    [][]string{{"env", "CGO_ENABLED=0", "go", "install", "github.com/opencode-ai/opencode@latest"}},
+			want:    [][]string{{"sudo", "npm", "install", "-g", "opencode-ai"}},
 		},
 		{
 			name:    "arch resolves pacman command",

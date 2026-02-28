@@ -97,16 +97,16 @@ func TestResolveAgentInstall(t *testing.T) {
 			want:    CommandSequence{{"sudo", "npm", "install", "-g", "@anthropic-ai/claude-code"}},
 		},
 		{
-			name:    "opencode on darwin uses brew tap and install",
+			name:    "opencode on darwin uses official anomalyco brew tap",
 			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
 			agent:   model.AgentOpenCode,
-			want:    CommandSequence{{"brew", "tap", "Gentleman-Programming/homebrew-tap"}, {"brew", "install", "opencode"}},
+			want:    CommandSequence{{"brew", "install", "anomalyco/tap/opencode"}},
 		},
 		{
-			name:    "opencode on ubuntu uses go install with CGO_ENABLED=0",
+			name:    "opencode on ubuntu uses npm install",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
 			agent:   model.AgentOpenCode,
-			want:    CommandSequence{{"env", "CGO_ENABLED=0", "go", "install", "github.com/opencode-ai/opencode@latest"}},
+			want:    CommandSequence{{"sudo", "npm", "install", "-g", "opencode-ai"}},
 		},
 		{
 			name:    "opencode on arch uses pacman",

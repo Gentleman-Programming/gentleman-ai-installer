@@ -348,17 +348,17 @@ func TestRunInstallLinuxAgentInstallResolvesGoInstallCommand(t *testing.T) {
 		t.Fatalf("RunInstall() error = %v", err)
 	}
 
-	// OpenCode on Ubuntu should resolve via go install with CGO_ENABLED=0.
+	// OpenCode on Ubuntu should resolve via npm install (official method from opencode.ai).
 	commands := recorder.get()
-	foundGoInstall := false
+	foundNpmInstall := false
 	for _, cmd := range commands {
-		if strings.Contains(cmd, "env CGO_ENABLED=0 go install github.com/opencode-ai/opencode@latest") {
-			foundGoInstall = true
+		if strings.Contains(cmd, "sudo npm install -g opencode-ai") {
+			foundNpmInstall = true
 			break
 		}
 	}
-	if !foundGoInstall {
-		t.Fatalf("expected go install command for opencode agent, got commands: %v", commands)
+	if !foundNpmInstall {
+		t.Fatalf("expected npm install command for opencode agent, got commands: %v", commands)
 	}
 }
 
