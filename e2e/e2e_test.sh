@@ -557,16 +557,17 @@ test_cc_theme_injection() {
 # --- Category 3: OpenCode component injection ---
 
 test_oc_engram_injection() {
-    log_test "OpenCode: engram injection (settings.json)"
+    log_test "OpenCode: engram injection (opencode.json)"
     cleanup_test_env
 
     if $BINARY install --agent opencode --component engram --persona neutral 2>&1; then
-        local settings="$HOME/.config/opencode/settings.json"
-        assert_file_exists "$settings" "OpenCode settings.json"
-        assert_file_contains "$settings" '"mcpServers"' "Has mcpServers key"
+        local settings="$HOME/.config/opencode/opencode.json"
+        assert_file_exists "$settings" "OpenCode opencode.json"
+        assert_file_contains "$settings" '"mcp"' "Has mcp key"
         assert_file_contains "$settings" '"engram"' "Has engram MCP entry"
         assert_file_contains "$settings" '"command"' "Has command key"
-        assert_valid_json "$settings" "settings.json is valid JSON"
+        assert_file_contains "$settings" '"type": "local"' "Engram uses local MCP type"
+        assert_valid_json "$settings" "opencode.json is valid JSON"
     else
         log_fail "OpenCode engram install command failed"
     fi
@@ -660,16 +661,16 @@ test_oc_skills_full() {
 }
 
 test_oc_context7_injection() {
-    log_test "OpenCode: context7 injection (settings.json MCP)"
+    log_test "OpenCode: context7 injection (opencode.json MCP)"
     cleanup_test_env
 
     if $BINARY install --agent opencode --component context7 --persona neutral 2>&1; then
-        local settings="$HOME/.config/opencode/settings.json"
-        assert_file_exists "$settings" "OpenCode settings.json"
-        assert_file_contains "$settings" '"mcpServers"' "Has mcpServers key"
+        local settings="$HOME/.config/opencode/opencode.json"
+        assert_file_exists "$settings" "OpenCode opencode.json"
+        assert_file_contains "$settings" '"mcp"' "Has mcp key"
         assert_file_contains "$settings" '"context7"' "Has context7 entry"
-        assert_file_contains "$settings" 'context7-mcp' "Has context7-mcp reference"
-        assert_valid_json "$settings" "settings.json is valid JSON"
+        assert_file_contains "$settings" 'https://mcp.context7.com/mcp' "Has Context7 MCP URL"
+        assert_valid_json "$settings" "opencode.json is valid JSON"
     else
         log_fail "OpenCode context7 install command failed"
     fi
@@ -680,11 +681,12 @@ test_oc_permissions_injection() {
     cleanup_test_env
 
     if $BINARY install --agent opencode --component permissions --persona neutral 2>&1; then
-        local settings="$HOME/.config/opencode/settings.json"
-        assert_file_exists "$settings" "OpenCode settings.json"
-        assert_file_contains "$settings" '"permissions"' "Has permissions key"
-        assert_file_contains "$settings" '"deny"' "Has deny list"
-        assert_valid_json "$settings" "settings.json is valid JSON"
+        local settings="$HOME/.config/opencode/opencode.json"
+        assert_file_exists "$settings" "OpenCode opencode.json"
+        assert_file_contains "$settings" '"permission"' "Has permission key"
+        assert_file_contains "$settings" '"bash"' "Has bash permissions"
+        assert_file_contains "$settings" '"read"' "Has read permissions"
+        assert_valid_json "$settings" "opencode.json is valid JSON"
     else
         log_fail "OpenCode permissions install command failed"
     fi
@@ -695,11 +697,11 @@ test_oc_theme_injection() {
     cleanup_test_env
 
     if $BINARY install --agent opencode --component theme --persona neutral 2>&1; then
-        local settings="$HOME/.config/opencode/settings.json"
-        assert_file_exists "$settings" "OpenCode settings.json"
+        local settings="$HOME/.config/opencode/opencode.json"
+        assert_file_exists "$settings" "OpenCode opencode.json"
         assert_file_contains "$settings" '"theme"' "Has theme key"
         assert_file_contains "$settings" 'gentleman-kanagawa' "Has gentleman-kanagawa theme"
-        assert_valid_json "$settings" "settings.json is valid JSON"
+        assert_valid_json "$settings" "opencode.json is valid JSON"
     else
         log_fail "OpenCode theme install command failed"
     fi
@@ -753,16 +755,16 @@ test_full_preset_opencode() {
     cleanup_test_env
 
     if $BINARY install --agent opencode --component sdd --component persona --component skills --component context7 --component permissions --component theme --preset full-gentleman --persona gentleman 2>&1; then
-        local settings="$HOME/.config/opencode/settings.json"
+        local settings="$HOME/.config/opencode/opencode.json"
         local agents_md="$HOME/.config/opencode/AGENTS.md"
 
-        # settings.json should have all overlays merged
-        assert_file_exists "$settings" "OpenCode settings.json"
-        assert_file_contains "$settings" '"permissions"' "Has permissions"
+        # opencode.json should have all overlays merged
+        assert_file_exists "$settings" "OpenCode opencode.json"
+        assert_file_contains "$settings" '"permission"' "Has permission config"
         assert_file_contains "$settings" '"theme"' "Has theme"
-        assert_file_contains "$settings" '"mcpServers"' "Has MCP servers"
+        assert_file_contains "$settings" '"mcp"' "Has MCP servers"
         assert_file_contains "$settings" '"context7"' "Has context7 MCP"
-        assert_valid_json "$settings" "settings.json is valid JSON"
+        assert_valid_json "$settings" "opencode.json is valid JSON"
 
         # AGENTS.md for persona
         assert_file_exists "$agents_md" "AGENTS.md exists"
@@ -824,8 +826,8 @@ test_ecosystem_both_agents() {
         # OpenCode
         assert_file_count_min "$HOME/.config/opencode/commands" "*.md" 7 "OpenCode SDD commands"
         assert_file_count_min "$HOME/.config/opencode/skill" "SKILL.md" 9 "OpenCode skills"
-        assert_file_contains "$HOME/.config/opencode/settings.json" '"context7"' "OpenCode context7"
-        assert_valid_json "$HOME/.config/opencode/settings.json" "OpenCode settings.json valid JSON"
+        assert_file_contains "$HOME/.config/opencode/opencode.json" '"context7"' "OpenCode context7"
+        assert_valid_json "$HOME/.config/opencode/opencode.json" "OpenCode opencode.json valid JSON"
 
         log_pass "Ecosystem preset: both agents have matching components"
     else
@@ -838,14 +840,14 @@ test_both_agents_permissions() {
     cleanup_test_env
 
     if $BINARY install --agent opencode --agent claude-code --component permissions --persona neutral 2>&1; then
-        local oc_settings="$HOME/.config/opencode/settings.json"
+        local oc_settings="$HOME/.config/opencode/opencode.json"
         local cc_settings="$HOME/.claude/settings.json"
 
-        assert_file_exists "$oc_settings" "OpenCode settings.json"
+        assert_file_exists "$oc_settings" "OpenCode opencode.json"
         assert_file_exists "$cc_settings" "Claude settings.json"
-        assert_file_contains "$oc_settings" '"permissions"' "OpenCode has permissions"
+        assert_file_contains "$oc_settings" '"permission"' "OpenCode has permission config"
         assert_file_contains "$cc_settings" '"permissions"' "Claude has permissions"
-        assert_valid_json "$oc_settings" "OpenCode settings valid JSON"
+        assert_valid_json "$oc_settings" "OpenCode opencode valid JSON"
         assert_valid_json "$cc_settings" "Claude settings valid JSON"
     else
         log_fail "Both agents + permissions install command failed"
@@ -955,11 +957,11 @@ test_idempotent_permissions_opencode() {
 
     $BINARY install --agent opencode --component permissions --persona neutral 2>&1 || true
     local first_hash
-    first_hash=$(md5sum "$HOME/.config/opencode/settings.json" 2>/dev/null | cut -d' ' -f1)
+    first_hash=$(md5sum "$HOME/.config/opencode/opencode.json" 2>/dev/null | cut -d' ' -f1)
 
     $BINARY install --agent opencode --component permissions --persona neutral 2>&1 || true
     local second_hash
-    second_hash=$(md5sum "$HOME/.config/opencode/settings.json" 2>/dev/null | cut -d' ' -f1)
+    second_hash=$(md5sum "$HOME/.config/opencode/opencode.json" 2>/dev/null | cut -d' ' -f1)
 
     if [ "$first_hash" = "$second_hash" ] && [ -n "$first_hash" ]; then
         log_pass "Idempotent: same permissions config after two runs"
@@ -1045,11 +1047,11 @@ test_idempotent_theme_opencode() {
 
     $BINARY install --agent opencode --component theme --persona neutral 2>&1 || true
     local first_hash
-    first_hash=$(md5sum "$HOME/.config/opencode/settings.json" 2>/dev/null | cut -d' ' -f1)
+    first_hash=$(md5sum "$HOME/.config/opencode/opencode.json" 2>/dev/null | cut -d' ' -f1)
 
     $BINARY install --agent opencode --component theme --persona neutral 2>&1 || true
     local second_hash
-    second_hash=$(md5sum "$HOME/.config/opencode/settings.json" 2>/dev/null | cut -d' ' -f1)
+    second_hash=$(md5sum "$HOME/.config/opencode/opencode.json" 2>/dev/null | cut -d' ' -f1)
 
     if [ "$first_hash" = "$second_hash" ] && [ -n "$first_hash" ]; then
         log_pass "Idempotent: same theme config after two runs"
@@ -1113,7 +1115,7 @@ test_edge_multiple_agents_same_component() {
     if $BINARY install --agent claude-code --agent opencode --component context7 --persona neutral 2>&1; then
         # Both agents should have context7
         assert_file_exists "$HOME/.claude/mcp/context7.json" "Claude context7"
-        assert_file_contains "$HOME/.config/opencode/settings.json" '"context7"' "OpenCode context7"
+        assert_file_contains "$HOME/.config/opencode/opencode.json" '"context7"' "OpenCode context7"
     else
         log_fail "Multiple agents + context7 install command failed"
     fi
@@ -1140,15 +1142,15 @@ test_edge_json_merge_preserves_existing() {
 
     # Create pre-existing settings
     mkdir -p "$HOME/.config/opencode"
-    echo '{"existingKey": "preserved"}' > "$HOME/.config/opencode/settings.json"
+    echo '{"existingKey": "preserved"}' > "$HOME/.config/opencode/opencode.json"
 
     # Install permissions on top
     $BINARY install --agent opencode --component permissions --persona neutral 2>&1 || true
 
-    local settings="$HOME/.config/opencode/settings.json"
+    local settings="$HOME/.config/opencode/opencode.json"
     assert_file_contains "$settings" '"existingKey"' "Pre-existing key preserved"
     assert_file_contains "$settings" '"preserved"' "Pre-existing value preserved"
-    assert_file_contains "$settings" '"permissions"' "Permissions merged in"
+    assert_file_contains "$settings" '"permission"' "Permission config merged in"
     assert_valid_json "$settings" "Merged JSON is valid"
 }
 
@@ -1156,15 +1158,15 @@ test_edge_multiple_json_overlays() {
     log_test "Edge case: multiple JSON overlays merge correctly"
     cleanup_test_env
 
-    # Install permissions, then theme, then context7 — all into OpenCode settings.json
+    # Install permissions, then theme, then context7 — all into OpenCode opencode.json
     $BINARY install --agent opencode --component permissions --persona neutral 2>&1 || true
     $BINARY install --agent opencode --component theme --persona neutral 2>&1 || true
     $BINARY install --agent opencode --component context7 --persona neutral 2>&1 || true
 
-    local settings="$HOME/.config/opencode/settings.json"
-    assert_file_contains "$settings" '"permissions"' "Permissions present after 3 merges"
+    local settings="$HOME/.config/opencode/opencode.json"
+    assert_file_contains "$settings" '"permission"' "Permission config present after 3 merges"
     assert_file_contains "$settings" '"theme"' "Theme present after 3 merges"
-    assert_file_contains "$settings" '"mcpServers"' "MCP servers present after 3 merges"
+    assert_file_contains "$settings" '"mcp"' "MCP servers present after 3 merges"
     assert_file_contains "$settings" '"context7"' "Context7 present after 3 merges"
     assert_valid_json "$settings" "Final merged JSON is valid"
 }
@@ -1264,11 +1266,11 @@ test_backup_idempotent_install() {
 
     $BINARY install --agent opencode --component permissions --persona neutral 2>&1 || true
     local first_content
-    first_content=$(cat "$HOME/.config/opencode/settings.json" 2>/dev/null)
+    first_content=$(cat "$HOME/.config/opencode/opencode.json" 2>/dev/null)
 
     $BINARY install --agent opencode --component permissions --persona neutral 2>&1 || true
     local second_content
-    second_content=$(cat "$HOME/.config/opencode/settings.json" 2>/dev/null)
+    second_content=$(cat "$HOME/.config/opencode/opencode.json" 2>/dev/null)
 
     if [ "$first_content" = "$second_content" ] && [ -n "$first_content" ]; then
         log_pass "Idempotent: same config after two runs (with backup)"

@@ -64,7 +64,7 @@ cleanup_test_env() {
 # to snapshot and restore.
 setup_fake_configs() {
     mkdir -p "$HOME/.config/opencode"
-    echo '{"fake-settings": true}' > "$HOME/.config/opencode/settings.json"
+    echo '{"fake-settings": true}' > "$HOME/.config/opencode/opencode.json"
 
     mkdir -p "$HOME/.claude"
     echo '# Fake CLAUDE.md' > "$HOME/.claude/CLAUDE.md"
