@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/gentleman-programming/gentleman-ai-installer/internal/cli"
@@ -30,7 +31,7 @@ func TestInstallDefaultsMatchTUIModelDefaults(t *testing.T) {
 		t.Fatalf("NormalizeInstallFlags() error = %v", err)
 	}
 
-	model := tui.NewModel(detection)
+	model := tui.NewModel(detection, "dev")
 	if !reflect.DeepEqual(input.Selection, model.Selection) {
 		t.Fatalf("selection mismatch\ncli=%#v\ntui=%#v", input.Selection, model.Selection)
 	}
@@ -38,7 +39,7 @@ func TestInstallDefaultsMatchTUIModelDefaults(t *testing.T) {
 
 func TestInstallPlannerParityWithTUISelection(t *testing.T) {
 	detection := system.DetectionResult{}
-	model := tui.NewModel(detection)
+	model := tui.NewModel(detection, "dev")
 
 	result, err := cli.RunInstall([]string{"--dry-run"}, detection)
 	if err != nil {
@@ -146,14 +147,18 @@ func TestGuardFlowLinuxDryRunPropagatesDecision(t *testing.T) {
 	}
 }
 
-func TestRunArgsNoCommandReturnsNil(t *testing.T) {
+func TestRunArgsNoCommandLaunchesTUI(t *testing.T) {
 	var buf bytes.Buffer
 	err := RunArgs(nil, &buf)
-	// On macOS this returns nil (OS is supported, no command).
-	// On Linux with a supported distro, same behavior.
-	// The guard only fails for unsupported OS, which runtime.GOOS won't be in CI.
-	if err != nil {
-		t.Fatalf("RunArgs(nil) error = %v", err)
+	// With no args, RunArgs now launches the TUI via Bubbletea.
+	// In a headless/test environment without a TTY, this returns an error
+	// about opening /dev/tty. That's expected — the TUI requires a terminal.
+	if err == nil {
+		// If no error, we're somehow in a TTY — that's fine too.
+		return
+	}
+	if !strings.Contains(err.Error(), "TTY") && !strings.Contains(err.Error(), "tty") {
+		t.Fatalf("RunArgs(nil) unexpected error = %v; want TTY-related error or nil", err)
 	}
 }
 

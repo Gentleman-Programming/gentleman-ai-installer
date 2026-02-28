@@ -101,9 +101,9 @@ func TestInstallCommand(t *testing.T) {
 			want:    []string{"brew", "install", "opencode"},
 		},
 		{
-			name:    "ubuntu resolves apt command",
+			name:    "ubuntu resolves go install command with CGO_ENABLED=0",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
-			want:    []string{"sudo", "apt-get", "install", "-y", "opencode"},
+			want:    []string{"env", "CGO_ENABLED=0", "go", "install", "github.com/opencode-ai/opencode@latest"},
 		},
 		{
 			name:    "arch resolves pacman command",

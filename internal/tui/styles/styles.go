@@ -22,8 +22,10 @@ var (
 // Cursor is the prefix used for the currently focused item.
 const Cursor = "▸ "
 
-// Tagline is shown on the welcome screen.
-const Tagline = "AI Gentle Stack v0.1.0 — One command. Any agent. Any OS."
+// Tagline returns the welcome screen tagline with the given version.
+func Tagline(version string) string {
+	return "AI Gentle Stack " + version + " — One command. Any agent. Any OS."
+}
 
 // Pre-built reusable styles.
 var (

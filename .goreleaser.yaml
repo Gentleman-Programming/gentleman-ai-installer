@@ -1,0 +1,49 @@
+version: 2
+
+project_name: gentleman-ai
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/gentleman-ai
+    binary: gentleman-ai
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+
+brews:
+  - repository:
+      owner: Gentleman-Programming
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    name: gentleman-ai
+    homepage: "https://github.com/Gentleman-Programming/gentleman-ai-installer"
+    description: "AI Gentle Stack — One command to configure any AI coding agent on any OS."
+    license: "MIT"
+    commit_msg_template: "chore: update gentleman-ai formula to {{ .Tag }}"

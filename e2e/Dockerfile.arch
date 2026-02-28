@@ -1,16 +1,22 @@
 # Dockerfile.arch — E2E test image for gentleman-ai on Arch Linux
 # Builds the binary from source and runs the E2E test suite as a non-root user.
-FROM archlinux:base
+# archlinux:base only provides x86_64 images. Force amd64 platform so Docker
+# uses QEMU emulation on ARM hosts (Apple Silicon).
+FROM --platform=linux/amd64 archlinux:base
 
 # ---------------------------------------------------------------------------
-# System dependencies
+# System dependencies (includes npm for claude-code tests)
 # ---------------------------------------------------------------------------
-RUN pacman -Syu --noconfirm && \
+# Disable pacman's seccomp sandbox — it fails under QEMU emulation on ARM hosts.
+# DisableSandbox prevents the ALPM seccomp filter that is incompatible with QEMU user-mode.
+RUN echo 'DisableSandbox' >> /etc/pacman.conf && \
+    pacman -Syu --noconfirm && \
     pacman -S --noconfirm \
         git \
         curl \
         sudo \
         go \
+        npm \
         base-devel \
     && pacman -Scc --noconfirm
 
@@ -39,6 +45,11 @@ RUN chmod +x /home/testuser/e2e/e2e_test.sh /home/testuser/e2e/lib.sh && \
     chown -R testuser:testuser /home/testuser
 
 USER testuser
+
+# Ensure go install binaries are on PATH for testuser
+ENV GOPATH="/home/testuser/go"
+ENV PATH="${GOPATH}/bin:/usr/local/go/bin:${PATH}"
+
 WORKDIR /home/testuser
 
 # ---------------------------------------------------------------------------

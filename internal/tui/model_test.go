@@ -9,7 +9,7 @@ import (
 )
 
 func TestNavigationWelcomeToDetection(t *testing.T) {
-	m := NewModel(system.DetectionResult{})
+	m := NewModel(system.DetectionResult{}, "dev")
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	state := updated.(Model)
@@ -20,7 +20,7 @@ func TestNavigationWelcomeToDetection(t *testing.T) {
 }
 
 func TestNavigationBackWithEscape(t *testing.T) {
-	m := NewModel(system.DetectionResult{})
+	m := NewModel(system.DetectionResult{}, "dev")
 	m.Screen = ScreenPersona
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
@@ -32,7 +32,7 @@ func TestNavigationBackWithEscape(t *testing.T) {
 }
 
 func TestAgentSelectionToggleAndContinue(t *testing.T) {
-	m := NewModel(system.DetectionResult{})
+	m := NewModel(system.DetectionResult{}, "dev")
 	m.Screen = ScreenAgents
 	m.Selection.Agents = []model.AgentID{model.AgentClaudeCode}
 	m.Cursor = 0
@@ -62,7 +62,7 @@ func TestAgentSelectionToggleAndContinue(t *testing.T) {
 }
 
 func TestReviewToInstallingInitializesProgress(t *testing.T) {
-	m := NewModel(system.DetectionResult{})
+	m := NewModel(system.DetectionResult{}, "dev")
 	m.Screen = ScreenReview
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})

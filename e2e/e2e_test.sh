@@ -139,17 +139,37 @@ test_invalid_component_rejected() {
     fi
 }
 
+test_version_command() {
+    log_test "Version command works"
+
+    output=$($BINARY version 2>&1) || true
+
+    if echo "$output" | grep -q "gentleman-ai"; then
+        log_pass "Version command returns binary name"
+    else
+        log_fail "Version command failed: $output"
+    fi
+}
+
 # ===========================================================================
 # TIER 2 — Full install tests (require RUN_FULL_E2E=1)
 # ===========================================================================
 
+# --- OpenCode tests ---
+
 test_install_opencode_permissions() {
-    log_test "Install: opencode + permissions"
+    log_test "Install: opencode + permissions (config injection)"
     cleanup_test_env
 
     if $BINARY install --agent opencode --component permissions 2>&1; then
-        if [ -f "$HOME/.config/opencode/settings.json" ]; then
-            log_pass "OpenCode settings.json created"
+        local settings="$HOME/.config/opencode/settings.json"
+        if [ -f "$settings" ]; then
+            # Validate content: must have permissions.deny
+            if grep -q '"permissions"' "$settings" && grep -q '"deny"' "$settings"; then
+                log_pass "OpenCode settings.json has permissions config"
+            else
+                log_fail "OpenCode settings.json missing permissions content: $(cat "$settings")"
+            fi
         else
             log_fail "OpenCode settings.json not found after install"
         fi
@@ -158,28 +178,19 @@ test_install_opencode_permissions() {
     fi
 }
 
-test_install_claude_code_persona() {
-    log_test "Install: claude-code + persona"
-    cleanup_test_env
-
-    if $BINARY install --agent claude-code --component persona 2>&1; then
-        if [ -f "$HOME/.claude/settings.json" ]; then
-            log_pass "Claude Code settings.json created"
-        else
-            log_fail "Claude Code settings.json not found after install"
-        fi
-    else
-        log_fail "Install exited with error"
-    fi
-}
-
 test_install_opencode_context7() {
-    log_test "Install: opencode + context7"
+    log_test "Install: opencode + context7 (MCP injection)"
     cleanup_test_env
 
     if $BINARY install --agent opencode --component context7 2>&1; then
-        if [ -f "$HOME/.config/opencode/settings.json" ]; then
-            log_pass "OpenCode settings.json created with context7"
+        local settings="$HOME/.config/opencode/settings.json"
+        if [ -f "$settings" ]; then
+            # Validate: must have mcpServers.context7
+            if grep -q '"mcpServers"' "$settings" && grep -q '"context7"' "$settings" && grep -q 'context7-mcp' "$settings"; then
+                log_pass "OpenCode settings.json has context7 MCP config"
+            else
+                log_fail "OpenCode settings.json missing context7 MCP: $(cat "$settings")"
+            fi
         else
             log_fail "OpenCode settings.json not found after context7 install"
         fi
@@ -189,14 +200,145 @@ test_install_opencode_context7() {
 }
 
 test_install_opencode_sdd() {
-    log_test "Install: opencode + sdd"
+    log_test "Install: opencode + sdd (command injection, no engram binary)"
     cleanup_test_env
 
-    if $BINARY install --agent opencode --component sdd 2>&1; then
-        if [ -d "$HOME/.config/opencode/commands" ]; then
-            log_pass "OpenCode SDD commands directory created"
+    # SDD depends on engram in the graph. Use --component sdd,engram explicitly.
+    # Engram binary install might fail (go install takes time), but SDD config
+    # injection should still write the command files.
+    # For this test, we only install sdd component directly with a minimal set.
+    if $BINARY install --agent opencode --component sdd --component engram 2>&1; then
+        local commands_dir="$HOME/.config/opencode/commands"
+        if [ -d "$commands_dir" ]; then
+            # Check SDD command files exist
+            local cmd_count
+            cmd_count=$(find "$commands_dir" -name "*.md" 2>/dev/null | wc -l)
+            if [ "$cmd_count" -ge 5 ]; then
+                # Validate content of one command file
+                if grep -q "sdd" "$commands_dir/sdd-init.md" 2>/dev/null; then
+                    log_pass "OpenCode SDD commands created ($cmd_count files)"
+                else
+                    log_fail "SDD command file content invalid"
+                fi
+            else
+                log_fail "Expected >=5 SDD command files, got $cmd_count"
+            fi
         else
-            log_fail "OpenCode SDD commands directory not found"
+            log_fail "OpenCode commands directory not found"
+        fi
+    else
+        log_fail "Install exited with error"
+    fi
+}
+
+test_install_opencode_persona() {
+    log_test "Install: opencode + persona"
+    cleanup_test_env
+
+    if $BINARY install --agent opencode --component persona 2>&1; then
+        local settings="$HOME/.config/opencode/settings.json"
+        if [ -f "$settings" ]; then
+            if grep -q '"persona"' "$settings"; then
+                log_pass "OpenCode settings.json has persona config"
+            else
+                log_fail "OpenCode settings.json missing persona: $(cat "$settings")"
+            fi
+        else
+            log_fail "OpenCode settings.json not found"
+        fi
+    else
+        log_fail "Install exited with error"
+    fi
+}
+
+# --- Claude Code tests ---
+
+test_install_claude_code_permissions() {
+    log_test "Install: claude-code + permissions"
+    cleanup_test_env
+
+    if $BINARY install --agent claude-code --component permissions 2>&1; then
+        local settings="$HOME/.claude/settings.json"
+        if [ -f "$settings" ]; then
+            if grep -q '"permissions"' "$settings" && grep -q '"deny"' "$settings"; then
+                log_pass "Claude settings.json has permissions config"
+            else
+                log_fail "Claude settings.json missing permissions: $(cat "$settings")"
+            fi
+        else
+            log_fail "Claude settings.json not found"
+        fi
+    else
+        log_fail "Install exited with error"
+    fi
+}
+
+test_install_claude_code_sdd() {
+    log_test "Install: claude-code + sdd (CLAUDE.md injection)"
+    cleanup_test_env
+
+    if $BINARY install --agent claude-code --component sdd --component engram 2>&1; then
+        local claude_md="$HOME/.claude/CLAUDE.md"
+        if [ -f "$claude_md" ]; then
+            if grep -q "SDD" "$claude_md" && grep -q "sdd-init" "$claude_md"; then
+                log_pass "CLAUDE.md has SDD orchestrator config"
+            else
+                log_fail "CLAUDE.md missing SDD content: $(cat "$claude_md")"
+            fi
+        else
+            log_fail "CLAUDE.md not found"
+        fi
+    else
+        log_fail "Install exited with error"
+    fi
+}
+
+test_install_claude_code_context7() {
+    log_test "Install: claude-code + context7 (MCP JSON injection)"
+    cleanup_test_env
+
+    if $BINARY install --agent claude-code --component context7 2>&1; then
+        local mcp_file="$HOME/.claude/mcp/context7.json"
+        if [ -f "$mcp_file" ]; then
+            if grep -q '"command"' "$mcp_file" && grep -q 'context7-mcp' "$mcp_file"; then
+                log_pass "Claude MCP context7.json created with correct content"
+            else
+                log_fail "Claude MCP context7.json has wrong content: $(cat "$mcp_file")"
+            fi
+        else
+            log_fail "Claude MCP context7.json not found"
+        fi
+    else
+        log_fail "Install exited with error"
+    fi
+}
+
+# --- Both agents test ---
+
+test_install_both_agents_permissions() {
+    log_test "Install: both agents + permissions"
+    cleanup_test_env
+
+    if $BINARY install --agent opencode --agent claude-code --component permissions 2>&1; then
+        local oc_settings="$HOME/.config/opencode/settings.json"
+        local cc_settings="$HOME/.claude/settings.json"
+        local ok=true
+
+        if [ ! -f "$oc_settings" ]; then
+            log_fail "OpenCode settings.json not found"
+            ok=false
+        fi
+        if [ ! -f "$cc_settings" ]; then
+            log_fail "Claude settings.json not found"
+            ok=false
+        fi
+
+        if $ok; then
+            if grep -q '"permissions"' "$oc_settings" && grep -q '"permissions"' "$cc_settings"; then
+                log_pass "Both agents have permissions config"
+            else
+                log_fail "One or both agents missing permissions config"
+            fi
         fi
     else
         log_fail "Install exited with error"
@@ -248,6 +390,25 @@ test_backup_contains_original_files() {
     fi
 }
 
+test_idempotent_install() {
+    log_test "Idempotent: running install twice produces same result"
+    cleanup_test_env
+
+    $BINARY install --agent opencode --component permissions 2>&1 || true
+    local first_content
+    first_content=$(cat "$HOME/.config/opencode/settings.json" 2>/dev/null)
+
+    $BINARY install --agent opencode --component permissions 2>&1 || true
+    local second_content
+    second_content=$(cat "$HOME/.config/opencode/settings.json" 2>/dev/null)
+
+    if [ "$first_content" = "$second_content" ] && [ -n "$first_content" ]; then
+        log_pass "Idempotent: same config after two runs"
+    else
+        log_fail "Config changed between runs"
+    fi
+}
+
 # ===========================================================================
 # Test execution
 # ===========================================================================
@@ -262,14 +423,19 @@ test_dry_run_platform_detection
 test_dry_run_detects_linux
 test_invalid_persona_rejected
 test_invalid_component_rejected
+test_version_command
 
 if [ "${RUN_FULL_E2E:-0}" = "1" ]; then
     log_info ""
     log_info "=== Tier 2: Full install tests ==="
     test_install_opencode_permissions
-    test_install_claude_code_persona
     test_install_opencode_context7
     test_install_opencode_sdd
+    test_install_opencode_persona
+    test_install_claude_code_permissions
+    test_install_claude_code_sdd
+    test_install_claude_code_context7
+    test_install_both_agents_permissions
 else
     log_skip "Tier 2 tests (set RUN_FULL_E2E=1 to enable)"
 fi
@@ -279,6 +445,7 @@ if [ "${RUN_BACKUP_TESTS:-0}" = "1" ]; then
     log_info "=== Tier 3: Backup/restore tests ==="
     test_backup_created_on_install
     test_backup_contains_original_files
+    test_idempotent_install
 else
     log_skip "Tier 3 tests (set RUN_BACKUP_TESTS=1 to enable)"
 fi

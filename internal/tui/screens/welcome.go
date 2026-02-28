@@ -15,7 +15,7 @@ func RenderWelcome(cursor int, version string) string {
 
 	b.WriteString(styles.RenderLogo())
 	b.WriteString("\n\n")
-	b.WriteString(styles.SubtextStyle.Render(styles.Tagline))
+	b.WriteString(styles.SubtextStyle.Render(styles.Tagline(version)))
 	b.WriteString("\n\n")
 	b.WriteString(styles.HeadingStyle.Render("Menu"))
 	b.WriteString("\n\n")

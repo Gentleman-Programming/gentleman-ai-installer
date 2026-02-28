@@ -21,14 +21,14 @@ func TestInstallCommandByProfile(t *testing.T) {
 			want:    []string{"brew", "install", "engram"},
 		},
 		{
-			name:    "ubuntu uses apt",
+			name:    "ubuntu uses go install with correct module path",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
-			want:    []string{"sudo", "apt-get", "install", "-y", "engram"},
+			want:    []string{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"},
 		},
 		{
-			name:    "arch uses pacman",
+			name:    "arch uses go install with correct module path",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
-			want:    []string{"sudo", "pacman", "-S", "--noconfirm", "engram"},
+			want:    []string{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"},
 		},
 		{
 			name:    "unsupported package manager errors",

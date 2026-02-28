@@ -6,10 +6,15 @@ import (
 	"io"
 	"os"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gentleman-programming/gentleman-ai-installer/internal/cli"
 	"github.com/gentleman-programming/gentleman-ai-installer/internal/system"
+	"github.com/gentleman-programming/gentleman-ai-installer/internal/tui"
 	"github.com/gentleman-programming/gentleman-ai-installer/internal/verify"
 )
+
+// Version is set from main via ldflags at build time.
+var Version = "dev"
 
 func Run() error {
 	return RunArgs(os.Args[1:], os.Stdout)
@@ -30,10 +35,16 @@ func RunArgs(args []string, stdout io.Writer) error {
 	}
 
 	if len(args) == 0 {
-		return nil
+		m := tui.NewModel(result, Version)
+		p := tea.NewProgram(m, tea.WithAltScreen())
+		_, err := p.Run()
+		return err
 	}
 
 	switch args[0] {
+	case "version", "--version", "-v":
+		_, _ = fmt.Fprintf(stdout, "gentleman-ai %s\n", Version)
+		return nil
 	case "install":
 		installResult, err := cli.RunInstall(args[1:], result)
 		if err != nil {

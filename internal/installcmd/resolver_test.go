@@ -14,34 +14,45 @@ func TestResolveDependencyInstall(t *testing.T) {
 	tests := []struct {
 		name    string
 		profile system.PlatformProfile
+		dep     string
 		want    []string
 		wantErr bool
 	}{
 		{
 			name:    "darwin resolves brew command",
 			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
-			want:    []string{"brew", "install", "opencode"},
+			dep:     "somepkg",
+			want:    []string{"brew", "install", "somepkg"},
 		},
 		{
 			name:    "ubuntu resolves apt command",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
-			want:    []string{"sudo", "apt-get", "install", "-y", "opencode"},
+			dep:     "somepkg",
+			want:    []string{"sudo", "apt-get", "install", "-y", "somepkg"},
 		},
 		{
 			name:    "arch resolves pacman command",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
-			want:    []string{"sudo", "pacman", "-S", "--noconfirm", "opencode"},
+			dep:     "somepkg",
+			want:    []string{"sudo", "pacman", "-S", "--noconfirm", "somepkg"},
 		},
 		{
 			name:    "unsupported package manager returns error",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: "fedora", PackageManager: "dnf"},
+			dep:     "somepkg",
+			wantErr: true,
+		},
+		{
+			name:    "empty dependency returns error",
+			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
+			dep:     "",
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			command, err := r.ResolveDependencyInstall(tt.profile, "opencode")
+			command, err := r.ResolveDependencyInstall(tt.profile, tt.dep)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("ResolveDependencyInstall() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -60,37 +71,125 @@ func TestResolveDependencyInstall(t *testing.T) {
 func TestResolveAgentInstall(t *testing.T) {
 	r := NewResolver()
 
-	command, err := r.ResolveAgentInstall(system.PlatformProfile{OS: "darwin", PackageManager: "brew"}, model.AgentClaudeCode)
-	if err != nil {
-		t.Fatalf("ResolveAgentInstall() error = %v", err)
-	}
-	if !reflect.DeepEqual(command, []string{"npm", "install", "-g", "@anthropic-ai/claude-code"}) {
-		t.Fatalf("ResolveAgentInstall() = %v", command)
+	tests := []struct {
+		name    string
+		profile system.PlatformProfile
+		agent   model.AgentID
+		want    []string
+		wantErr bool
+	}{
+		{
+			name:    "claude-code on darwin uses npm without sudo",
+			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
+			agent:   model.AgentClaudeCode,
+			want:    []string{"npm", "install", "-g", "@anthropic-ai/claude-code"},
+		},
+		{
+			name:    "claude-code on linux uses sudo npm",
+			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
+			agent:   model.AgentClaudeCode,
+			want:    []string{"sudo", "npm", "install", "-g", "@anthropic-ai/claude-code"},
+		},
+		{
+			name:    "claude-code on arch uses sudo npm",
+			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
+			agent:   model.AgentClaudeCode,
+			want:    []string{"sudo", "npm", "install", "-g", "@anthropic-ai/claude-code"},
+		},
+		{
+			name:    "opencode on darwin uses brew",
+			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
+			agent:   model.AgentOpenCode,
+			want:    []string{"brew", "install", "opencode"},
+		},
+		{
+			name:    "opencode on ubuntu uses go install with CGO_ENABLED=0",
+			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
+			agent:   model.AgentOpenCode,
+			want:    []string{"env", "CGO_ENABLED=0", "go", "install", "github.com/opencode-ai/opencode@latest"},
+		},
+		{
+			name:    "opencode on arch uses pacman",
+			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
+			agent:   model.AgentOpenCode,
+			want:    []string{"sudo", "pacman", "-S", "--noconfirm", "opencode"},
+		},
+		{
+			name:    "unsupported agent returns error",
+			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
+			agent:   "unsupported",
+			wantErr: true,
+		},
 	}
 
-	command, err = r.ResolveAgentInstall(
-		system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
-		model.AgentOpenCode,
-	)
-	if err != nil {
-		t.Fatalf("ResolveAgentInstall() error = %v", err)
-	}
-	if !reflect.DeepEqual(command, []string{"sudo", "apt-get", "install", "-y", "opencode"}) {
-		t.Fatalf("ResolveAgentInstall() = %v", command)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			command, err := r.ResolveAgentInstall(tt.profile, tt.agent)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ResolveAgentInstall() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			if !reflect.DeepEqual(command, tt.want) {
+				t.Fatalf("ResolveAgentInstall() = %v, want %v", command, tt.want)
+			}
+		})
 	}
 }
 
 func TestResolveComponentInstall(t *testing.T) {
 	r := NewResolver()
 
-	command, err := r.ResolveComponentInstall(
-		system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
-		model.ComponentEngram,
-	)
-	if err != nil {
-		t.Fatalf("ResolveComponentInstall() error = %v", err)
+	tests := []struct {
+		name      string
+		profile   system.PlatformProfile
+		component model.ComponentID
+		want      []string
+		wantErr   bool
+	}{
+		{
+			name:      "engram on darwin uses brew",
+			profile:   system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
+			component: model.ComponentEngram,
+			want:      []string{"brew", "install", "engram"},
+		},
+		{
+			name:      "engram on ubuntu uses go install with correct module path",
+			profile:   system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
+			component: model.ComponentEngram,
+			want:      []string{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"},
+		},
+		{
+			name:      "engram on arch uses go install with correct module path",
+			profile:   system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
+			component: model.ComponentEngram,
+			want:      []string{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"},
+		},
+		{
+			name:      "unsupported component returns error",
+			profile:   system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
+			component: "unsupported",
+			wantErr:   true,
+		},
 	}
-	if !reflect.DeepEqual(command, []string{"sudo", "pacman", "-S", "--noconfirm", "engram"}) {
-		t.Fatalf("ResolveComponentInstall() = %v", command)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			command, err := r.ResolveComponentInstall(tt.profile, tt.component)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ResolveComponentInstall() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			if !reflect.DeepEqual(command, tt.want) {
+				t.Fatalf("ResolveComponentInstall() = %v, want %v", command, tt.want)
+			}
+		})
 	}
 }

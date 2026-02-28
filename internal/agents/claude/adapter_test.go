@@ -94,10 +94,23 @@ func TestInstallCommand(t *testing.T) {
 	tests := []struct {
 		name    string
 		profile system.PlatformProfile
+		want    []string
 	}{
-		{name: "darwin profile", profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"}},
-		{name: "ubuntu profile", profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"}},
-		{name: "arch profile", profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"}},
+		{
+			name:    "darwin profile uses npm without sudo",
+			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
+			want:    []string{"npm", "install", "-g", "@anthropic-ai/claude-code"},
+		},
+		{
+			name:    "ubuntu profile uses sudo npm",
+			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
+			want:    []string{"sudo", "npm", "install", "-g", "@anthropic-ai/claude-code"},
+		},
+		{
+			name:    "arch profile uses sudo npm",
+			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
+			want:    []string{"sudo", "npm", "install", "-g", "@anthropic-ai/claude-code"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -107,8 +120,8 @@ func TestInstallCommand(t *testing.T) {
 				t.Fatalf("InstallCommand() returned error: %v", err)
 			}
 
-			if !reflect.DeepEqual(command, []string{"npm", "install", "-g", "@anthropic-ai/claude-code"}) {
-				t.Fatalf("InstallCommand() = %v", command)
+			if !reflect.DeepEqual(command, tt.want) {
+				t.Fatalf("InstallCommand() = %v, want %v", command, tt.want)
 			}
 		})
 	}

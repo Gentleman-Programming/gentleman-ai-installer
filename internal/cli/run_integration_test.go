@@ -194,7 +194,7 @@ func TestRunInstallLinuxArchResolvesPacmanCommands(t *testing.T) {
 	}
 }
 
-func TestRunInstallLinuxUbuntuWithEngramResolvesAptInstallCommand(t *testing.T) {
+func TestRunInstallLinuxUbuntuWithEngramResolvesGoInstallCommand(t *testing.T) {
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -220,21 +220,21 @@ func TestRunInstallLinuxUbuntuWithEngramResolvesAptInstallCommand(t *testing.T) 
 		t.Fatalf("verification ready = false, report = %#v", result.Verify)
 	}
 
-	// Verify that at least one command used apt-get (the engram install command).
+	// Verify that at least one command used go install (the engram install command).
 	commands := recorder.get()
-	foundApt := false
+	foundGoInstall := false
 	for _, cmd := range commands {
-		if strings.Contains(cmd, "apt-get install -y engram") {
-			foundApt = true
+		if strings.Contains(cmd, "env CGO_ENABLED=0 go install github.com/Gentleman-Programming/engram/cmd/engram@latest") {
+			foundGoInstall = true
 			break
 		}
 	}
-	if !foundApt {
-		t.Fatalf("expected apt-get install command for engram, got commands: %v", commands)
+	if !foundGoInstall {
+		t.Fatalf("expected go install command for engram, got commands: %v", commands)
 	}
 }
 
-func TestRunInstallLinuxArchWithEngramResolvesPacmanInstallCommand(t *testing.T) {
+func TestRunInstallLinuxArchWithEngramResolvesGoInstallCommand(t *testing.T) {
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -261,15 +261,15 @@ func TestRunInstallLinuxArchWithEngramResolvesPacmanInstallCommand(t *testing.T)
 	}
 
 	commands := recorder.get()
-	foundPacman := false
+	foundGoInstall := false
 	for _, cmd := range commands {
-		if strings.Contains(cmd, "pacman -S --noconfirm engram") {
-			foundPacman = true
+		if strings.Contains(cmd, "env CGO_ENABLED=0 go install github.com/Gentleman-Programming/engram/cmd/engram@latest") {
+			foundGoInstall = true
 			break
 		}
 	}
-	if !foundPacman {
-		t.Fatalf("expected pacman install command for engram, got commands: %v", commands)
+	if !foundGoInstall {
+		t.Fatalf("expected go install command for engram, got commands: %v", commands)
 	}
 }
 
@@ -294,8 +294,9 @@ func TestRunInstallLinuxRollsBackOnComponentFailure(t *testing.T) {
 
 	osUserHomeDir = func() (string, error) { return home, nil }
 	runCommand = func(name string, args ...string) error {
-		// Fail the apt-get engram install to trigger rollback.
-		if name == "sudo" && len(args) >= 4 && args[0] == "apt-get" && args[3] == "engram" {
+		// Fail the engram install command to trigger rollback.
+		// Command is now: env CGO_ENABLED=0 go install .../engram@latest
+		if name == "env" && strings.Contains(strings.Join(args, " "), "engram") {
 			return os.ErrPermission
 		}
 		return nil
@@ -325,7 +326,7 @@ func TestRunInstallLinuxRollsBackOnComponentFailure(t *testing.T) {
 	}
 }
 
-func TestRunInstallLinuxAgentInstallResolvesProfileCommand(t *testing.T) {
+func TestRunInstallLinuxAgentInstallResolvesGoInstallCommand(t *testing.T) {
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -347,17 +348,17 @@ func TestRunInstallLinuxAgentInstallResolvesProfileCommand(t *testing.T) {
 		t.Fatalf("RunInstall() error = %v", err)
 	}
 
-	// OpenCode on Ubuntu should resolve via apt-get.
+	// OpenCode on Ubuntu should resolve via go install with CGO_ENABLED=0.
 	commands := recorder.get()
-	foundAptAgent := false
+	foundGoInstall := false
 	for _, cmd := range commands {
-		if strings.Contains(cmd, "apt-get install -y opencode") {
-			foundAptAgent = true
+		if strings.Contains(cmd, "env CGO_ENABLED=0 go install github.com/opencode-ai/opencode@latest") {
+			foundGoInstall = true
 			break
 		}
 	}
-	if !foundAptAgent {
-		t.Fatalf("expected apt-get install command for opencode agent, got commands: %v", commands)
+	if !foundGoInstall {
+		t.Fatalf("expected go install command for opencode agent, got commands: %v", commands)
 	}
 }
 

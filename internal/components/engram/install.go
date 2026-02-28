@@ -9,7 +9,7 @@ import (
 )
 
 func InstallCommand(profile system.PlatformProfile) ([]string, error) {
-	return installcmd.NewResolver().ResolveDependencyInstall(profile, "engram")
+	return installcmd.NewResolver().ResolveComponentInstall(profile, model.ComponentEngram)
 }
 
 func AgentSupportsEngram(agent model.AgentID) bool {

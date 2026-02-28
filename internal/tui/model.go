@@ -34,6 +34,7 @@ type Model struct {
 	Width          int
 	Height         int
 	Cursor         int
+	Version        string
 
 	Selection      model.Selection
 	Detection      system.DetectionResult
@@ -44,7 +45,7 @@ type Model struct {
 	Err            error
 }
 
-func NewModel(detection system.DetectionResult) Model {
+func NewModel(detection system.DetectionResult, version string) Model {
 	selection := model.Selection{
 		Agents:     preselectedAgents(detection),
 		Persona:    model.PersonaGentleman,
@@ -54,6 +55,7 @@ func NewModel(detection system.DetectionResult) Model {
 
 	return Model{
 		Screen:    ScreenWelcome,
+		Version:   version,
 		Selection: selection,
 		Detection: detection,
 		Progress: NewProgressState([]string{
@@ -84,7 +86,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) View() string {
 	switch m.Screen {
 	case ScreenWelcome:
-		return screens.RenderWelcome(m.Cursor, "v0.1.0")
+		return screens.RenderWelcome(m.Cursor, m.Version)
 	case ScreenDetection:
 		return screens.RenderDetection(m.Detection, m.Cursor)
 	case ScreenAgents:
