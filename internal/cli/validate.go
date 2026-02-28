@@ -125,7 +125,7 @@ func componentsForPreset(preset model.PresetID) []model.ComponentID {
 	case model.PresetMinimal:
 		return []model.ComponentID{model.ComponentEngram}
 	case model.PresetEcosystemOnly:
-		return []model.ComponentID{model.ComponentEngram, model.ComponentSDD, model.ComponentSkills, model.ComponentContext7}
+		return []model.ComponentID{model.ComponentEngram, model.ComponentSDD, model.ComponentSkills, model.ComponentContext7, model.ComponentGGA}
 	case model.PresetCustom:
 		return nil
 	default:
@@ -136,6 +136,7 @@ func componentsForPreset(preset model.PresetID) []model.ComponentID {
 			model.ComponentContext7,
 			model.ComponentPersona,
 			model.ComponentPermission,
+			model.ComponentGGA,
 		}
 	}
 }

@@ -12,11 +12,13 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/internal/backup"
 	"github.com/gentleman-programming/gentle-ai/internal/components/engram"
+	"github.com/gentleman-programming/gentle-ai/internal/components/gga"
 	"github.com/gentleman-programming/gentle-ai/internal/components/mcp"
 	"github.com/gentleman-programming/gentle-ai/internal/components/permissions"
 	"github.com/gentleman-programming/gentle-ai/internal/components/persona"
 	"github.com/gentleman-programming/gentle-ai/internal/components/sdd"
 	"github.com/gentleman-programming/gentle-ai/internal/components/skills"
+	"github.com/gentleman-programming/gentle-ai/internal/components/theme"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
 	"github.com/gentleman-programming/gentle-ai/internal/pipeline"
 	"github.com/gentleman-programming/gentle-ai/internal/planner"
@@ -54,7 +56,7 @@ func RunInstall(args []string, detection system.DetectionResult) (InstallResult,
 	if err != nil {
 		return InstallResult{}, err
 	}
-	profile := resolveInstallProfile(detection)
+	profile := ResolveInstallProfile(detection)
 	resolved.PlatformDecision = planner.PlatformDecisionFromProfile(profile)
 
 	review := planner.BuildReviewPayload(input.Selection, resolved)
@@ -239,12 +241,12 @@ func (s agentInstallStep) Run() error {
 		return fmt.Errorf("create adapter for %q: %w", s.agent, err)
 	}
 
-	command, err := adapter.InstallCommand(s.profile)
+	commands, err := adapter.InstallCommand(s.profile)
 	if err != nil {
 		return fmt.Errorf("resolve install command for %q: %w", s.agent, err)
 	}
 
-	return runInstallCommand(command)
+	return runCommandSequence(commands)
 }
 
 type componentApplyStep struct {
@@ -263,11 +265,11 @@ func (s componentApplyStep) ID() string {
 func (s componentApplyStep) Run() error {
 	switch s.component {
 	case model.ComponentEngram:
-		command, err := engram.InstallCommand(s.profile)
+		commands, err := engram.InstallCommand(s.profile)
 		if err != nil {
 			return fmt.Errorf("resolve install command for component %q: %w", s.component, err)
 		}
-		if err := runInstallCommand(command); err != nil {
+		if err := runCommandSequence(commands); err != nil {
 			return err
 		}
 		for _, agent := range s.agents {
@@ -285,7 +287,7 @@ func (s componentApplyStep) Run() error {
 		return nil
 	case model.ComponentPersona:
 		for _, agent := range s.agents {
-			if _, err := persona.Inject(s.homeDir, agent); err != nil {
+			if _, err := persona.Inject(s.homeDir, agent, s.selection.Persona); err != nil {
 				return fmt.Errorf("inject persona for %q: %w", agent, err)
 			}
 		}
@@ -305,13 +307,32 @@ func (s componentApplyStep) Run() error {
 		}
 		return nil
 	case model.ComponentSkills:
-		skillFiles := selectedSkillFiles(s.selection)
-		if len(skillFiles) == 0 {
+		skillIDs := selectedSkillIDs(s.selection)
+		if len(skillIDs) == 0 {
 			return nil
 		}
 		for _, agent := range s.agents {
-			if _, err := skills.Inject(s.homeDir, agent, skillFiles); err != nil {
+			if _, err := skills.Inject(s.homeDir, agent, skillIDs); err != nil {
 				return fmt.Errorf("inject skills for %q: %w", agent, err)
+			}
+		}
+		return nil
+	case model.ComponentGGA:
+		commands, err := gga.InstallCommand(s.profile)
+		if err != nil {
+			return fmt.Errorf("resolve install command for component %q: %w", s.component, err)
+		}
+		if err := runCommandSequence(commands); err != nil {
+			return err
+		}
+		if _, err := gga.WriteDefaultConfig(s.homeDir); err != nil {
+			return fmt.Errorf("write gga config: %w", err)
+		}
+		return nil
+	case model.ComponentTheme:
+		for _, agent := range s.agents {
+			if _, err := theme.Inject(s.homeDir, agent); err != nil {
+				return fmt.Errorf("inject theme for %q: %w", agent, err)
 			}
 		}
 		return nil
@@ -320,7 +341,24 @@ func (s componentApplyStep) Run() error {
 	}
 }
 
-func resolveInstallProfile(detection system.DetectionResult) system.PlatformProfile {
+// BuildRealStagePlan creates a StagePlan with real backup, agent install, and component apply steps.
+// It is used by both the CLI and TUI paths.
+func BuildRealStagePlan(homeDir string, selection model.Selection, resolved planner.ResolvedPlan, profile system.PlatformProfile) (pipeline.StagePlan, error) {
+	backupRoot := filepath.Join(homeDir, ".gentle-ai", "backups")
+	if err := os.MkdirAll(backupRoot, 0o755); err != nil {
+		return pipeline.StagePlan{}, fmt.Errorf("create backup root directory %q: %w", backupRoot, err)
+	}
+
+	runtime, err := newInstallRuntime(homeDir, selection, resolved, profile)
+	if err != nil {
+		return pipeline.StagePlan{}, err
+	}
+
+	return runtime.stagePlan(), nil
+}
+
+// ResolveInstallProfile returns the platform profile from detection, defaulting to darwin/brew.
+func ResolveInstallProfile(detection system.DetectionResult) system.PlatformProfile {
 	if detection.System.Profile.OS != "" {
 		return detection.System.Profile
 	}
@@ -332,13 +370,20 @@ func resolveInstallProfile(detection system.DetectionResult) system.PlatformProf
 	}
 }
 
-func runInstallCommand(command []string) error {
-	if len(command) == 0 {
-		return fmt.Errorf("empty install command")
+// runCommandSequence runs each command in the sequence one at a time, stopping on first error.
+func runCommandSequence(commands [][]string) error {
+	if len(commands) == 0 {
+		return fmt.Errorf("empty command sequence")
 	}
 
-	if err := runCommand(command[0], command[1:]...); err != nil {
-		return fmt.Errorf("run command %q: %w", strings.Join(command, " "), err)
+	for _, command := range commands {
+		if len(command) == 0 {
+			return fmt.Errorf("empty command in sequence")
+		}
+
+		if err := runCommand(command[0], command[1:]...); err != nil {
+			return fmt.Errorf("run command %q: %w", strings.Join(command, " "), err)
+		}
 	}
 
 	return nil
@@ -351,18 +396,14 @@ func executeCommand(name string, args ...string) error {
 	return cmd.Run()
 }
 
-func selectedSkillFiles(selection model.Selection) []skills.SkillFile {
-	if len(selection.Skills) == 0 {
-		return nil
+// selectedSkillIDs returns the skill IDs to install. If the selection
+// has explicit skills, those are used; otherwise skills are derived from the preset.
+func selectedSkillIDs(selection model.Selection) []model.SkillID {
+	if len(selection.Skills) > 0 {
+		return selection.Skills
 	}
 
-	files := make([]skills.SkillFile, 0, len(selection.Skills))
-	for _, skillID := range selection.Skills {
-		content := []byte("# " + string(skillID) + "\n\nInstalled by AI Gentle Stack MVP.\n")
-		files = append(files, skills.SkillFile{Name: string(skillID), Content: content})
-	}
-
-	return files
+	return skills.SkillsForPreset(selection.Preset)
 }
 
 func backupTargets(homeDir string, selection model.Selection, resolved planner.ResolvedPlan) []string {
@@ -388,13 +429,13 @@ func componentPaths(homeDir string, selection model.Selection, agents []model.Ag
 		switch component {
 		case model.ComponentEngram:
 			if agent == model.AgentClaudeCode {
-				paths = append(paths, filepath.Join(homeDir, ".claude", "plugins", "engram.md"))
+				paths = append(paths,
+					filepath.Join(homeDir, ".claude", "mcp", "engram.json"),
+					filepath.Join(homeDir, ".claude", "CLAUDE.md"),
+				)
 			}
 			if agent == model.AgentOpenCode {
-				paths = append(paths,
-					filepath.Join(homeDir, ".config", "opencode", "plugins", "engram.ts"),
-					filepath.Join(homeDir, ".config", "opencode", "settings.json"),
-				)
+				paths = append(paths, filepath.Join(homeDir, ".config", "opencode", "settings.json"))
 			}
 		case model.ComponentSDD:
 			if agent == model.AgentClaudeCode {
@@ -406,12 +447,10 @@ func componentPaths(homeDir string, selection model.Selection, agents []model.Ag
 				}
 			}
 		case model.ComponentSkills:
-			for _, skillFile := range selectedSkillFiles(selection) {
-				if agent == model.AgentClaudeCode {
-					paths = append(paths, filepath.Join(homeDir, ".claude", "skills", skillFile.Name, "SKILL.md"))
-				}
-				if agent == model.AgentOpenCode {
-					paths = append(paths, filepath.Join(homeDir, ".config", "opencode", "skill", skillFile.Name, "SKILL.md"))
+			for _, skillID := range selectedSkillIDs(selection) {
+				path, pathErr := skills.SkillPathForAgent(homeDir, agent, skillID)
+				if pathErr == nil {
+					paths = append(paths, path)
 				}
 			}
 		case model.ComponentContext7:
@@ -422,13 +461,32 @@ func componentPaths(homeDir string, selection model.Selection, agents []model.Ag
 				paths = append(paths, filepath.Join(homeDir, ".config", "opencode", "settings.json"))
 			}
 		case model.ComponentPersona:
+			// Custom persona does nothing — no files to backup or verify.
+			if selection.Persona == model.PersonaCustom {
+				break
+			}
+			if agent == model.AgentClaudeCode {
+				paths = append(paths, filepath.Join(homeDir, ".claude", "CLAUDE.md"))
+				if selection.Persona == model.PersonaGentleman {
+					paths = append(paths,
+						filepath.Join(homeDir, ".claude", "output-styles", "gentleman.md"),
+						filepath.Join(homeDir, ".claude", "settings.json"),
+					)
+				}
+			}
+			if agent == model.AgentOpenCode {
+				paths = append(paths, filepath.Join(homeDir, ".config", "opencode", "AGENTS.md"))
+			}
+		case model.ComponentPermission:
 			if agent == model.AgentClaudeCode {
 				paths = append(paths, filepath.Join(homeDir, ".claude", "settings.json"))
 			}
 			if agent == model.AgentOpenCode {
 				paths = append(paths, filepath.Join(homeDir, ".config", "opencode", "settings.json"))
 			}
-		case model.ComponentPermission:
+		case model.ComponentGGA:
+			paths = append(paths, filepath.Join(homeDir, ".config", "gga", "config.json"))
+		case model.ComponentTheme:
 			if agent == model.AgentClaudeCode {
 				paths = append(paths, filepath.Join(homeDir, ".claude", "settings.json"))
 			}

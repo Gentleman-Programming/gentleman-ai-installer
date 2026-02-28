@@ -26,7 +26,7 @@ func (m mockAdapter) Detect(_ context.Context, _ string) (bool, string, string, 
 	return false, "", "", false, nil
 }
 
-func (m mockAdapter) InstallCommand(system.PlatformProfile) ([]string, error) {
+func (m mockAdapter) InstallCommand(system.PlatformProfile) ([][]string, error) {
 	return nil, nil
 }
 

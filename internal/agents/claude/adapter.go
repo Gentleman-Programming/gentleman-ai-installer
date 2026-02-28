@@ -54,7 +54,7 @@ func (a *Adapter) Detect(_ context.Context, homeDir string) (bool, string, strin
 	return installed, binaryPath, configPath, stat.isDir, nil
 }
 
-func (a *Adapter) InstallCommand(profile system.PlatformProfile) ([]string, error) {
+func (a *Adapter) InstallCommand(profile system.PlatformProfile) ([][]string, error) {
 	resolver := a.resolver
 	if resolver == nil {
 		resolver = installcmd.NewResolver()

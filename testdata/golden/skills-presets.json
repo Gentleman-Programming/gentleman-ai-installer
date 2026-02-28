@@ -1,9 +1,17 @@
 [
   {
-    "ID": "full-stack",
-    "Skills": [
+    "preset": "full-gentleman",
+    "skills": [
+      "sdd-init",
+      "sdd-explore",
+      "sdd-propose",
+      "sdd-spec",
+      "sdd-design",
+      "sdd-tasks",
+      "sdd-apply",
+      "sdd-verify",
+      "sdd-archive",
       "typescript",
-      "claude-developer-platform",
       "react-19",
       "nextjs-15",
       "tailwind-4",
@@ -12,14 +20,42 @@
       "ai-sdk-5",
       "playwright",
       "pytest",
+      "django-drf",
       "go-testing"
     ]
   },
   {
-    "ID": "minimal",
-    "Skills": [
+    "preset": "ecosystem-only",
+    "skills": [
+      "sdd-init",
+      "sdd-explore",
+      "sdd-propose",
+      "sdd-spec",
+      "sdd-design",
+      "sdd-tasks",
+      "sdd-apply",
+      "sdd-verify",
+      "sdd-archive",
       "typescript",
-      "claude-developer-platform"
+      "react-19",
+      "nextjs-15",
+      "tailwind-4",
+      "zustand-5",
+      "zod-4"
+    ]
+  },
+  {
+    "preset": "minimal",
+    "skills": [
+      "sdd-init",
+      "sdd-explore",
+      "sdd-propose",
+      "sdd-spec",
+      "sdd-design",
+      "sdd-tasks",
+      "sdd-apply",
+      "sdd-verify",
+      "sdd-archive"
     ]
   }
 ]

@@ -12,23 +12,23 @@ func TestInstallCommandByProfile(t *testing.T) {
 	tests := []struct {
 		name    string
 		profile system.PlatformProfile
-		want    []string
+		want    [][]string
 		wantErr bool
 	}{
 		{
-			name:    "darwin uses brew",
+			name:    "darwin uses brew tap and install",
 			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
-			want:    []string{"brew", "install", "engram"},
+			want:    [][]string{{"brew", "tap", "Gentleman-Programming/homebrew-tap"}, {"brew", "install", "engram"}},
 		},
 		{
 			name:    "ubuntu uses go install with correct module path",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
-			want:    []string{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"},
+			want:    [][]string{{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}},
 		},
 		{
 			name:    "arch uses go install with correct module path",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
-			want:    []string{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"},
+			want:    [][]string{{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}},
 		},
 		{
 			name:    "unsupported package manager errors",

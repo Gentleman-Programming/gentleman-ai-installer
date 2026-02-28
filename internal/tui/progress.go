@@ -101,6 +101,15 @@ func ProgressFromExecution(result pipeline.ExecutionResult) ProgressState {
 	return progress
 }
 
+func (p ProgressState) HasFailures() bool {
+	for _, item := range p.Items {
+		if item.Status == string(pipeline.StepStatusFailed) {
+			return true
+		}
+	}
+	return false
+}
+
 func (p ProgressState) ViewModel() screens.InstallProgress {
 	items := make([]screens.ProgressItem, 0, len(p.Items))
 	for _, item := range p.Items {
@@ -118,5 +127,6 @@ func (p ProgressState) ViewModel() screens.InstallProgress {
 		Items:       items,
 		Logs:        append([]string(nil), p.Logs...),
 		Done:        p.Percent() >= 100,
+		Failed:      p.HasFailures(),
 	}
 }

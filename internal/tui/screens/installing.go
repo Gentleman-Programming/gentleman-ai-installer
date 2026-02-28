@@ -68,11 +68,31 @@ func RenderInstalling(progress InstallProgress, spinner string) string {
 
 	if progress.Done {
 		b.WriteString("\n")
-		b.WriteString(styles.SuccessStyle.Render("Press Enter to continue."))
+		succeeded, failed := countResults(progress.Items)
+		if progress.Failed {
+			b.WriteString(styles.WarningStyle.Render(fmt.Sprintf("Completed with errors: %d succeeded, %d failed", succeeded, failed)))
+			b.WriteString("\n")
+		} else {
+			b.WriteString(styles.SuccessStyle.Render(fmt.Sprintf("All %d steps completed successfully.", succeeded)))
+			b.WriteString("\n")
+		}
+		b.WriteString(styles.HelpStyle.Render("Press Enter to continue."))
 		b.WriteString("\n")
 	}
 
 	return b.String()
+}
+
+func countResults(items []ProgressItem) (succeeded, failed int) {
+	for _, item := range items {
+		switch item.Status {
+		case "succeeded":
+			succeeded++
+		case "failed":
+			failed++
+		}
+	}
+	return
 }
 
 func renderBar(percent int) string {

@@ -92,23 +92,23 @@ func TestInstallCommand(t *testing.T) {
 	tests := []struct {
 		name    string
 		profile system.PlatformProfile
-		want    []string
+		want    [][]string
 		wantErr bool
 	}{
 		{
-			name:    "darwin resolves brew command",
+			name:    "darwin resolves brew tap and install",
 			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
-			want:    []string{"brew", "install", "opencode"},
+			want:    [][]string{{"brew", "tap", "Gentleman-Programming/homebrew-tap"}, {"brew", "install", "opencode"}},
 		},
 		{
 			name:    "ubuntu resolves go install command with CGO_ENABLED=0",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
-			want:    []string{"env", "CGO_ENABLED=0", "go", "install", "github.com/opencode-ai/opencode@latest"},
+			want:    [][]string{{"env", "CGO_ENABLED=0", "go", "install", "github.com/opencode-ai/opencode@latest"}},
 		},
 		{
 			name:    "arch resolves pacman command",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
-			want:    []string{"sudo", "pacman", "-S", "--noconfirm", "opencode"},
+			want:    [][]string{{"sudo", "pacman", "-S", "--noconfirm", "opencode"}},
 		},
 		{
 			name:    "unsupported package manager errors",

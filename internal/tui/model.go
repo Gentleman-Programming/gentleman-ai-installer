@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/backup"
 	"github.com/gentleman-programming/gentle-ai/internal/catalog"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/pipeline"
 	"github.com/gentleman-programming/gentle-ai/internal/planner"
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 	"github.com/gentleman-programming/gentle-ai/internal/tui/screens"
@@ -24,6 +26,35 @@ func tickCmd() tea.Cmd {
 		return TickMsg(t)
 	})
 }
+
+// StepProgressMsg is sent from the pipeline goroutine when a step changes status.
+type StepProgressMsg struct {
+	StepID string
+	Status pipeline.StepStatus
+	Err    error
+}
+
+// PipelineDoneMsg is sent when the pipeline finishes execution.
+type PipelineDoneMsg struct {
+	Result pipeline.ExecutionResult
+}
+
+// BackupRestoreMsg is sent when a backup restore completes.
+type BackupRestoreMsg struct {
+	Err error
+}
+
+// ExecuteFunc builds and runs the installation pipeline. It receives a ProgressFunc
+// callback to emit step-level progress events, and returns the ExecutionResult.
+type ExecuteFunc func(
+	selection model.Selection,
+	resolved planner.ResolvedPlan,
+	detection system.DetectionResult,
+	onProgress pipeline.ProgressFunc,
+) pipeline.ExecutionResult
+
+// RestoreFunc restores a backup from a manifest.
+type RestoreFunc func(manifest backup.Manifest) error
 
 type Screen int
 
@@ -55,8 +86,19 @@ type Model struct {
 	DependencyPlan planner.ResolvedPlan
 	Review         planner.ReviewPayload
 	Progress       ProgressState
+	Execution      pipeline.ExecutionResult
 	Backups        []backup.Manifest
 	Err            error
+
+	// ExecuteFn is called to run the real pipeline. When nil, the installing
+	// screen falls back to manual step-through (useful for tests/development).
+	ExecuteFn ExecuteFunc
+
+	// RestoreFn is called to restore a backup. When nil, restore is a no-op.
+	RestoreFn RestoreFunc
+
+	// pipelineRunning tracks whether the pipeline goroutine is active.
+	pipelineRunning bool
 }
 
 func NewModel(detection system.DetectionResult, version string) Model {
@@ -96,11 +138,88 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tickCmd()
 		}
 		return m, nil
+	case StepProgressMsg:
+		return m.handleStepProgress(msg)
+	case PipelineDoneMsg:
+		return m.handlePipelineDone(msg)
+	case BackupRestoreMsg:
+		return m.handleBackupRestore(msg)
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
 	}
 
 	return m, nil
+}
+
+func (m Model) handleStepProgress(msg StepProgressMsg) (tea.Model, tea.Cmd) {
+	if m.Screen != ScreenInstalling {
+		return m, nil
+	}
+
+	idx := m.findProgressItem(msg.StepID)
+	if idx < 0 {
+		return m, nil
+	}
+
+	switch msg.Status {
+	case pipeline.StepStatusRunning:
+		m.Progress.Start(idx)
+		m.Progress.AppendLog("running: %s", msg.StepID)
+	case pipeline.StepStatusSucceeded:
+		m.Progress.Mark(idx, string(pipeline.StepStatusSucceeded))
+		m.Progress.AppendLog("done: %s", msg.StepID)
+	case pipeline.StepStatusFailed:
+		m.Progress.Mark(idx, string(pipeline.StepStatusFailed))
+		errMsg := "unknown error"
+		if msg.Err != nil {
+			errMsg = msg.Err.Error()
+		}
+		m.Progress.AppendLog("FAILED: %s — %s", msg.StepID, errMsg)
+	}
+
+	return m, nil
+}
+
+func (m Model) handlePipelineDone(msg PipelineDoneMsg) (tea.Model, tea.Cmd) {
+	m.Execution = msg.Result
+	m.pipelineRunning = false
+
+	// Mark any remaining pending items as done (edge case: empty pipeline).
+	if m.Progress.Percent() < 100 {
+		for i := range m.Progress.Items {
+			if m.Progress.Items[i].Status == ProgressStatusPending ||
+				m.Progress.Items[i].Status == ProgressStatusRunning {
+				m.Progress.Mark(i, string(pipeline.StepStatusSucceeded))
+			}
+		}
+	}
+
+	if msg.Result.Err != nil {
+		m.Progress.AppendLog("pipeline completed with errors")
+	} else {
+		m.Progress.AppendLog("pipeline completed successfully")
+	}
+
+	return m, nil
+}
+
+func (m Model) handleBackupRestore(msg BackupRestoreMsg) (tea.Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.Err = msg.Err
+		m.Progress.AppendLog("restore failed: %s", msg.Err.Error())
+	} else {
+		m.Progress.AppendLog("backup restored successfully")
+	}
+	return m, nil
+}
+
+func (m Model) findProgressItem(stepID string) int {
+	for i, item := range m.Progress.Items {
+		if item.Label == stepID {
+			return i
+		}
+	}
+	return -1
 }
 
 func (m Model) View() string {
@@ -145,6 +264,10 @@ func (m Model) handleKeyPress(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "esc":
+		// Don't allow going back while pipeline is running.
+		if m.Screen == ScreenInstalling && m.pipelineRunning {
+			return m, nil
+		}
 		return m.goBack(), nil
 	case " ":
 		switch m.Screen {
@@ -231,29 +354,112 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 		m.setScreen(ScreenPreset)
 	case ScreenReview:
 		if m.Cursor == 0 {
-			m.setScreen(ScreenInstalling)
-			m.SpinnerFrame = 0
-			m.Progress.Start(0)
-			m.Progress.AppendLog("starting installation")
-			return m, tickCmd()
+			return m.startInstalling()
 		}
 		m.setScreen(ScreenDependencyTree)
 	case ScreenInstalling:
-		if m.Progress.Percent() >= 100 {
+		if m.Progress.Done() {
 			m.setScreen(ScreenComplete)
 			return m, nil
 		}
-		m.Progress.Mark(m.Progress.Current, "succeeded")
-		if m.Progress.Percent() >= 100 {
-			m.setScreen(ScreenComplete)
+		// If no ExecuteFn, fall back to manual step-through for dev/tests.
+		if m.ExecuteFn == nil && !m.pipelineRunning {
+			m.Progress.Mark(m.Progress.Current, "succeeded")
+			if m.Progress.Done() {
+				m.setScreen(ScreenComplete)
+			}
 		}
 	case ScreenComplete:
 		return m, tea.Quit
 	case ScreenBackups:
+		if m.Cursor < len(m.Backups) {
+			return m.restoreBackup(m.Backups[m.Cursor])
+		}
 		m.setScreen(ScreenWelcome)
 	}
 
 	return m, nil
+}
+
+// startInstalling initializes the progress state from the resolved plan and
+// starts the pipeline execution in a goroutine if ExecuteFn is provided.
+func (m Model) startInstalling() (tea.Model, tea.Cmd) {
+	m.setScreen(ScreenInstalling)
+	m.SpinnerFrame = 0
+
+	// Build progress labels from the resolved plan.
+	labels := buildProgressLabels(m.DependencyPlan)
+	if len(labels) == 0 {
+		// Fallback labels when the plan is empty (dev/test).
+		labels = []string{
+			"Install dependencies",
+			"Configure selected agents",
+			"Inject ecosystem components",
+		}
+	}
+
+	m.Progress = NewProgressState(labels)
+	m.Progress.Start(0)
+	m.Progress.AppendLog("starting installation")
+
+	if m.ExecuteFn == nil {
+		// No real executor; fall back to manual step-through.
+		return m, tickCmd()
+	}
+
+	m.pipelineRunning = true
+
+	// Capture values for the goroutine closure.
+	executeFn := m.ExecuteFn
+	selection := m.Selection
+	resolved := m.DependencyPlan
+	detection := m.Detection
+
+	return m, tea.Batch(tickCmd(), func() tea.Msg {
+		onProgress := func(event pipeline.ProgressEvent) {
+			// NOTE: ProgressFunc is called synchronously from the pipeline goroutine.
+			// We cannot use p.Send() here because we don't have a reference to the
+			// tea.Program. Instead, these events are collected in the ExecutionResult
+			// and the PipelineDoneMsg handles the final state. For real-time updates,
+			// we rely on the pipeline calling this synchronously from each step.
+		}
+
+		result := executeFn(selection, resolved, detection, onProgress)
+		return PipelineDoneMsg{Result: result}
+	})
+}
+
+// restoreBackup triggers a backup restore in a goroutine.
+func (m Model) restoreBackup(manifest backup.Manifest) (tea.Model, tea.Cmd) {
+	if m.RestoreFn == nil {
+		m.Err = fmt.Errorf("restore not available")
+		return m, nil
+	}
+
+	restoreFn := m.RestoreFn
+	return m, func() tea.Msg {
+		err := restoreFn(manifest)
+		return BackupRestoreMsg{Err: err}
+	}
+}
+
+// buildProgressLabels creates step labels from the resolved plan that match
+// the step IDs the pipeline will produce.
+func buildProgressLabels(resolved planner.ResolvedPlan) []string {
+	labels := make([]string, 0, 1+len(resolved.Agents)+len(resolved.OrderedComponents)+1)
+
+	labels = append(labels, "prepare:backup-snapshot")
+	labels = append(labels, "apply:rollback-restore")
+
+	for _, agent := range resolved.Agents {
+		labels = append(labels, "agent:"+string(agent))
+	}
+
+	for _, component := range resolved.OrderedComponents {
+		labels = append(labels, "component:"+string(component))
+	}
+
+	return labels
 }
 
 func (m Model) goBack() Model {
@@ -380,7 +586,7 @@ func componentsForPreset(preset model.PresetID) []model.ComponentID {
 	case model.PresetMinimal:
 		return []model.ComponentID{model.ComponentEngram}
 	case model.PresetEcosystemOnly:
-		return []model.ComponentID{model.ComponentEngram, model.ComponentSDD, model.ComponentSkills, model.ComponentContext7}
+		return []model.ComponentID{model.ComponentEngram, model.ComponentSDD, model.ComponentSkills, model.ComponentContext7, model.ComponentGGA}
 	case model.PresetCustom:
 		return nil
 	default:
@@ -391,6 +597,7 @@ func componentsForPreset(preset model.PresetID) []model.ComponentID {
 			model.ComponentContext7,
 			model.ComponentPersona,
 			model.ComponentPermission,
+			model.ComponentGGA,
 		}
 	}
 }

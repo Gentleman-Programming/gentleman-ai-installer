@@ -1,17 +1,40 @@
 package pipeline
 
+// OrchestratorOption configures the orchestrator.
+type OrchestratorOption func(*Orchestrator)
+
+// WithFailurePolicy sets the failure policy for the apply stage runner.
+func WithFailurePolicy(policy FailurePolicy) OrchestratorOption {
+	return func(o *Orchestrator) {
+		o.runner.FailurePolicy = policy
+	}
+}
+
+// WithProgressFunc sets a callback that receives progress events during execution.
+func WithProgressFunc(fn ProgressFunc) OrchestratorOption {
+	return func(o *Orchestrator) {
+		o.runner.OnProgress = fn
+	}
+}
+
 type Orchestrator struct {
 	runner   Runner
 	policy   RollbackPolicy
 	stepByID map[string]Step
 }
 
-func NewOrchestrator(policy RollbackPolicy) *Orchestrator {
-	return &Orchestrator{
+func NewOrchestrator(policy RollbackPolicy, opts ...OrchestratorOption) *Orchestrator {
+	o := &Orchestrator{
 		runner:   Runner{},
 		policy:   policy,
 		stepByID: map[string]Step{},
 	}
+
+	for _, opt := range opts {
+		opt(o)
+	}
+
+	return o
 }
 
 func (o *Orchestrator) Execute(plan StagePlan) ExecutionResult {

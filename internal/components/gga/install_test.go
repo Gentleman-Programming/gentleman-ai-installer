@@ -12,23 +12,29 @@ func TestInstallCommandByProfile(t *testing.T) {
 	tests := []struct {
 		name    string
 		profile system.PlatformProfile
-		want    []string
+		want    [][]string
 		wantErr bool
 	}{
 		{
-			name:    "darwin uses brew",
+			name:    "darwin uses brew tap and install",
 			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
-			want:    []string{"brew", "install", "gga"},
+			want:    [][]string{{"brew", "tap", "Gentleman-Programming/homebrew-tap"}, {"brew", "install", "gga"}},
 		},
 		{
-			name:    "ubuntu uses apt",
+			name:    "ubuntu uses git clone and install.sh",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
-			want:    []string{"sudo", "apt-get", "install", "-y", "gga"},
+			want: [][]string{
+				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", "/tmp/gentleman-guardian-angel"},
+				{"bash", "/tmp/gentleman-guardian-angel/install.sh"},
+			},
 		},
 		{
-			name:    "arch uses pacman",
+			name:    "arch uses git clone and install.sh",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
-			want:    []string{"sudo", "pacman", "-S", "--noconfirm", "gga"},
+			want: [][]string{
+				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", "/tmp/gentleman-guardian-angel"},
+				{"bash", "/tmp/gentleman-guardian-angel/install.sh"},
+			},
 		},
 		{
 			name:    "unsupported package manager errors",

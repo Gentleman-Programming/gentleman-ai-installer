@@ -94,22 +94,22 @@ func TestInstallCommand(t *testing.T) {
 	tests := []struct {
 		name    string
 		profile system.PlatformProfile
-		want    []string
+		want    [][]string
 	}{
 		{
 			name:    "darwin profile uses npm without sudo",
 			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
-			want:    []string{"npm", "install", "-g", "@anthropic-ai/claude-code"},
+			want:    [][]string{{"npm", "install", "-g", "@anthropic-ai/claude-code"}},
 		},
 		{
 			name:    "ubuntu profile uses sudo npm",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
-			want:    []string{"sudo", "npm", "install", "-g", "@anthropic-ai/claude-code"},
+			want:    [][]string{{"sudo", "npm", "install", "-g", "@anthropic-ai/claude-code"}},
 		},
 		{
 			name:    "arch profile uses sudo npm",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
-			want:    []string{"sudo", "npm", "install", "-g", "@anthropic-ai/claude-code"},
+			want:    [][]string{{"sudo", "npm", "install", "-g", "@anthropic-ai/claude-code"}},
 		},
 	}
 

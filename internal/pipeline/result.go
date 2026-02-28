@@ -5,9 +5,12 @@ import "time"
 type StepStatus string
 
 const (
+	StepStatusPending    StepStatus = "pending"
+	StepStatusRunning    StepStatus = "running"
 	StepStatusSucceeded  StepStatus = "succeeded"
 	StepStatusFailed     StepStatus = "failed"
 	StepStatusRolledBack StepStatus = "rolled-back"
+	StepStatusSkipped    StepStatus = "skipped"
 )
 
 type StepResult struct {

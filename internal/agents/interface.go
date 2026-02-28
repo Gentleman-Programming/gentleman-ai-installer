@@ -17,5 +17,5 @@ type Adapter interface {
 	Agent() model.AgentID
 	SupportsAutoInstall() bool
 	Detect(ctx context.Context, homeDir string) (installed bool, binaryPath string, configPath string, configFound bool, err error)
-	InstallCommand(profile system.PlatformProfile) ([]string, error)
+	InstallCommand(profile system.PlatformProfile) ([][]string, error)
 }
