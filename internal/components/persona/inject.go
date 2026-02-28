@@ -112,15 +112,16 @@ func personaContent(agent model.AgentID, persona model.PersonaID) string {
 	case model.PersonaCustom:
 		return ""
 	default:
-		// Gentleman persona — try agent-specific asset, then fallback.
+		// Gentleman persona — try agent-specific asset, then generic fallback.
 		switch agent {
 		case model.AgentClaudeCode:
 			return assets.MustRead("claude/persona-gentleman.md")
 		case model.AgentOpenCode:
 			return assets.MustRead("opencode/persona-gentleman.md")
 		default:
-			// For agents without a specific persona asset, use neutral content.
-			return neutralPersonaContent
+			// Generic persona includes Gentleman personality + skills table + SDD orchestrator.
+			// Used by Gemini CLI, Cursor, VS Code Copilot, and any future agents.
+			return assets.MustRead("generic/persona-gentleman.md")
 		}
 	}
 }

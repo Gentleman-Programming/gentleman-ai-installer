@@ -12,9 +12,9 @@ type Agent struct {
 var allAgents = []Agent{
 	{ID: model.AgentClaudeCode, Name: "Claude Code", Tier: model.TierFull, ConfigPath: "~/.claude"},
 	{ID: model.AgentOpenCode, Name: "OpenCode", Tier: model.TierFull, ConfigPath: "~/.config/opencode"},
-	{ID: model.AgentGeminiCLI, Name: "Gemini CLI", Tier: model.TierGood, ConfigPath: "~/.gemini"},
-	{ID: model.AgentCursor, Name: "Cursor", Tier: model.TierPartial, ConfigPath: "~/.cursor"},
-	{ID: model.AgentVSCodeCopilot, Name: "VS Code Copilot", Tier: model.TierPartial, ConfigPath: "~/.github"},
+	{ID: model.AgentGeminiCLI, Name: "Gemini CLI", Tier: model.TierFull, ConfigPath: "~/.gemini"},
+	{ID: model.AgentCursor, Name: "Cursor", Tier: model.TierFull, ConfigPath: "~/.cursor"},
+	{ID: model.AgentVSCodeCopilot, Name: "VS Code Copilot", Tier: model.TierFull, ConfigPath: "~/.github"},
 }
 
 // mvpAgents are the original MVP agents (Claude Code, OpenCode).

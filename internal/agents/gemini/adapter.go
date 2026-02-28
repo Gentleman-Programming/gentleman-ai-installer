@@ -34,7 +34,7 @@ func (a *Adapter) Agent() model.AgentID {
 }
 
 func (a *Adapter) Tier() model.SupportTier {
-	return model.TierGood
+	return model.TierFull
 }
 
 // --- Detection ---

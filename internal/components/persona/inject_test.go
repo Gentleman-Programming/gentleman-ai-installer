@@ -300,7 +300,7 @@ func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestInjectCursorGentlemanWritesRulesFile(t *testing.T) {
+func TestInjectCursorGentlemanWritesRulesFileWithRealContent(t *testing.T) {
 	home := t.TempDir()
 
 	cursorAdapter, err := agents.NewAdapter("cursor")
@@ -313,8 +313,80 @@ func TestInjectCursorGentlemanWritesRulesFile(t *testing.T) {
 		t.Fatalf("Inject(cursor) error = %v", injectErr)
 	}
 
-	// Cursor uses FileReplace strategy — should write a system prompt file.
 	if !result.Changed {
 		t.Fatalf("Inject(cursor, gentleman) changed = false")
+	}
+
+	// Verify the generic persona content was used — not just neutral one-liner.
+	path := filepath.Join(home, ".cursor", "rules", "gentle-ai.mdc")
+	content, readErr := os.ReadFile(path)
+	if readErr != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, readErr)
+	}
+
+	text := string(content)
+	if !strings.Contains(text, "Senior Architect") {
+		t.Fatal("Cursor persona missing 'Senior Architect' — got neutral fallback instead of generic persona")
+	}
+	if !strings.Contains(text, "Skills") {
+		t.Fatal("Cursor persona missing skills section")
+	}
+}
+
+func TestInjectGeminiGentlemanWritesSystemPromptWithRealContent(t *testing.T) {
+	home := t.TempDir()
+
+	geminiAdapter, err := agents.NewAdapter("gemini-cli")
+	if err != nil {
+		t.Fatalf("NewAdapter(gemini-cli) error = %v", err)
+	}
+
+	result, injectErr := Inject(home, geminiAdapter, model.PersonaGentleman)
+	if injectErr != nil {
+		t.Fatalf("Inject(gemini) error = %v", injectErr)
+	}
+
+	if !result.Changed {
+		t.Fatal("Inject(gemini, gentleman) changed = false")
+	}
+
+	path := filepath.Join(home, ".gemini", "GEMINI.md")
+	content, readErr := os.ReadFile(path)
+	if readErr != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, readErr)
+	}
+
+	text := string(content)
+	if !strings.Contains(text, "Senior Architect") {
+		t.Fatal("Gemini persona missing 'Senior Architect'")
+	}
+}
+
+func TestInjectVSCodeGentlemanWritesCopilotInstructions(t *testing.T) {
+	home := t.TempDir()
+
+	vscodeAdapter, err := agents.NewAdapter("vscode-copilot")
+	if err != nil {
+		t.Fatalf("NewAdapter(vscode-copilot) error = %v", err)
+	}
+
+	result, injectErr := Inject(home, vscodeAdapter, model.PersonaGentleman)
+	if injectErr != nil {
+		t.Fatalf("Inject(vscode) error = %v", injectErr)
+	}
+
+	if !result.Changed {
+		t.Fatal("Inject(vscode, gentleman) changed = false")
+	}
+
+	path := filepath.Join(home, ".github", "copilot-instructions.md")
+	content, readErr := os.ReadFile(path)
+	if readErr != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, readErr)
+	}
+
+	text := string(content)
+	if !strings.Contains(text, "Senior Architect") {
+		t.Fatal("VS Code persona missing 'Senior Architect'")
 	}
 }

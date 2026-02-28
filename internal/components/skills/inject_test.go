@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,7 +9,9 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
 	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/vscode"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
 
 func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
@@ -100,16 +103,40 @@ func TestInjectSkipsUnknownSkillGracefully(t *testing.T) {
 	}
 }
 
+// noSkillsAdapter is a mock adapter that does not support skills.
+type noSkillsAdapter struct{}
+
+func (a noSkillsAdapter) Agent() model.AgentID    { return "no-skills" }
+func (a noSkillsAdapter) Tier() model.SupportTier { return model.TierFull }
+func (a noSkillsAdapter) Detect(_ context.Context, _ string) (bool, string, string, bool, error) {
+	return false, "", "", false, nil
+}
+func (a noSkillsAdapter) SupportsAutoInstall() bool { return false }
+func (a noSkillsAdapter) InstallCommand(_ system.PlatformProfile) ([][]string, error) {
+	return nil, nil
+}
+func (a noSkillsAdapter) GlobalConfigDir(_ string) string  { return "" }
+func (a noSkillsAdapter) SystemPromptFile(_ string) string { return "" }
+func (a noSkillsAdapter) SkillsDir(_ string) string        { return "" }
+func (a noSkillsAdapter) SettingsPath(_ string) string     { return "" }
+func (a noSkillsAdapter) SystemPromptStrategy() model.SystemPromptStrategy {
+	return model.StrategyFileReplace
+}
+func (a noSkillsAdapter) MCPStrategy() model.MCPStrategy          { return model.StrategyMergeIntoSettings }
+func (a noSkillsAdapter) MCPConfigPath(_ string, _ string) string { return "" }
+func (a noSkillsAdapter) SupportsOutputStyles() bool              { return false }
+func (a noSkillsAdapter) OutputStyleDir(_ string) string          { return "" }
+func (a noSkillsAdapter) SupportsSlashCommands() bool             { return false }
+func (a noSkillsAdapter) CommandsDir(_ string) string             { return "" }
+func (a noSkillsAdapter) SupportsSkills() bool                    { return false }
+func (a noSkillsAdapter) SupportsSystemPrompt() bool              { return false }
+func (a noSkillsAdapter) SupportsMCP() bool                       { return false }
+
 func TestInjectSkipsUnsupportedAgent(t *testing.T) {
 	home := t.TempDir()
 
-	// VS Code Copilot does not support skills — Inject should skip gracefully.
-	vscodeAdapter, err := agents.NewAdapter("vscode-copilot")
-	if err != nil {
-		t.Fatalf("NewAdapter(vscode-copilot) error = %v", err)
-	}
-
-	result, injectErr := Inject(home, vscodeAdapter, []model.SkillID{model.SkillTypeScript})
+	// Mock adapter that does not support skills — Inject should skip gracefully.
+	result, injectErr := Inject(home, noSkillsAdapter{}, []model.SkillID{model.SkillTypeScript})
 	if injectErr != nil {
 		t.Fatalf("Inject() unexpected error = %v", injectErr)
 	}
@@ -120,6 +147,28 @@ func TestInjectSkipsUnsupportedAgent(t *testing.T) {
 	}
 	if result.Changed {
 		t.Fatal("Inject() changed = true, want false for unsupported agent")
+	}
+}
+
+func TestInjectVSCodeWritesSkillFiles(t *testing.T) {
+	home := t.TempDir()
+
+	adapter := vscode.NewAdapter()
+
+	result, err := Inject(home, adapter, []model.SkillID{model.SkillTypeScript})
+	if err != nil {
+		t.Fatalf("Inject(vscode) error = %v", err)
+	}
+	if !result.Changed {
+		t.Fatalf("Inject(vscode) changed = false")
+	}
+	if len(result.Files) != 1 {
+		t.Fatalf("Inject(vscode) files len = %d, want 1", len(result.Files))
+	}
+
+	path := filepath.Join(home, ".vscode", "skills", "typescript", "SKILL.md")
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected skill file %q: %v", path, err)
 	}
 }
 

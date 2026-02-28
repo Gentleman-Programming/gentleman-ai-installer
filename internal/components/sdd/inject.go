@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gentleman-programming/gentle-ai/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/internal/assets"
@@ -35,13 +36,18 @@ func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 		changed = changed || result.Changed
 		files = append(files, result.Files...)
 
-	case model.StrategyFileReplace:
-		// For FileReplace agents, SDD orchestrator content is embedded
-		// in the persona file — no separate injection here.
-		// SDD skills are still written below.
-
-	case model.StrategyAppendToFile:
-		// Same as FileReplace — SDD content goes in persona.
+	case model.StrategyFileReplace, model.StrategyAppendToFile:
+		// For FileReplace/AppendToFile agents, the SDD orchestrator is included
+		// in the generic persona asset. However, if the user chose neutral or
+		// custom persona, the SDD content must still be injected. We append the
+		// SDD orchestrator section to the existing system prompt file so it is
+		// always present regardless of persona choice.
+		result, err := injectFileAppend(homeDir, adapter)
+		if err != nil {
+			return InjectionResult{}, err
+		}
+		changed = changed || result.Changed
+		files = append(files, result.Files...)
 	}
 
 	// 2. Write slash commands (if the agent supports them).
@@ -100,6 +106,44 @@ func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 	}
 
 	return InjectionResult{Changed: changed, Files: files}, nil
+}
+
+// sddOrchestratorMarker is used to detect if SDD content was already injected
+// (e.g., via the persona file or a previous SDD injection).
+const sddOrchestratorMarker = "## Spec-Driven Development (SDD) Orchestrator"
+
+func injectFileAppend(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
+	promptPath := adapter.SystemPromptFile(homeDir)
+
+	existing, err := readFileOrEmpty(promptPath)
+	if err != nil {
+		return InjectionResult{}, err
+	}
+
+	// If the SDD orchestrator section is already present (e.g., from the
+	// gentleman persona asset which includes it), skip to avoid duplication.
+	if strings.Contains(existing, sddOrchestratorMarker) {
+		return InjectionResult{Files: []string{promptPath}}, nil
+	}
+
+	// Use generic SDD orchestrator content suitable for any agent.
+	content := assets.MustRead("generic/sdd-orchestrator.md")
+
+	updated := existing
+	if len(updated) > 0 && !strings.HasSuffix(updated, "\n") {
+		updated += "\n"
+	}
+	if len(updated) > 0 {
+		updated += "\n"
+	}
+	updated += content
+
+	writeResult, err := filemerge.WriteFileAtomic(promptPath, []byte(updated), 0o644)
+	if err != nil {
+		return InjectionResult{}, err
+	}
+
+	return InjectionResult{Changed: writeResult.Changed, Files: []string{promptPath}}, nil
 }
 
 func injectMarkdownSections(homeDir string, adapter agents.Adapter) (InjectionResult, error) {

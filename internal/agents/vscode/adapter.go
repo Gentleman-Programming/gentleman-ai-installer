@@ -26,7 +26,7 @@ func (a *Adapter) Agent() model.AgentID {
 }
 
 func (a *Adapter) Tier() model.SupportTier {
-	return model.TierPartial
+	return model.TierFull
 }
 
 // --- Detection ---
@@ -52,28 +52,27 @@ func (a *Adapter) InstallCommand(_ system.PlatformProfile) ([][]string, error) {
 }
 
 // --- Config paths ---
-// VS Code Copilot uses project-level .github/ directory for system instructions.
+// VS Code ecosystem: Copilot reads ~/.github/copilot-instructions.md for system
+// instructions. Skills and MCP config go under ~/.vscode/ so that any AI extension
+// (Copilot, Claude extension, Codex, Roo, etc.) can benefit from them.
 
-func (a *Adapter) GlobalConfigDir(_ string) string {
-	// VS Code doesn't have a global agent config dir in the same sense.
-	// Copilot instructions live at project level (.github/).
-	return ""
+func (a *Adapter) GlobalConfigDir(homeDir string) string {
+	return filepath.Join(homeDir, ".vscode")
 }
 
 func (a *Adapter) SystemPromptFile(homeDir string) string {
-	// Global instructions path — VS Code supports ~/.github/copilot-instructions.md
+	// Global instructions path — VS Code Copilot reads ~/.github/copilot-instructions.md
 	return filepath.Join(homeDir, ".github", "copilot-instructions.md")
 }
 
-func (a *Adapter) SkillsDir(_ string) string {
-	// VS Code Copilot doesn't support standalone skill files.
-	return ""
+func (a *Adapter) SkillsDir(homeDir string) string {
+	// Skills under ~/.vscode/skills/ — available to any VS Code AI extension.
+	return filepath.Join(homeDir, ".vscode", "skills")
 }
 
-func (a *Adapter) SettingsPath(_ string) string {
-	// VS Code settings.json lives in platform-specific app data dirs.
-	// We don't modify it for MCP — Copilot uses its own extension settings.
-	return ""
+func (a *Adapter) SettingsPath(homeDir string) string {
+	// MCP settings for VS Code AI extensions.
+	return filepath.Join(homeDir, ".vscode", "settings.json")
 }
 
 // --- Config strategies ---
@@ -83,14 +82,13 @@ func (a *Adapter) SystemPromptStrategy() model.SystemPromptStrategy {
 }
 
 func (a *Adapter) MCPStrategy() model.MCPStrategy {
-	// VS Code Copilot MCP is configured via VS Code settings which we don't manage.
 	return model.StrategyMergeIntoSettings
 }
 
 // --- MCP ---
 
-func (a *Adapter) MCPConfigPath(_ string, _ string) string {
-	return ""
+func (a *Adapter) MCPConfigPath(homeDir string, _ string) string {
+	return filepath.Join(homeDir, ".vscode", "settings.json")
 }
 
 // --- Optional capabilities ---
@@ -112,7 +110,7 @@ func (a *Adapter) CommandsDir(_ string) string {
 }
 
 func (a *Adapter) SupportsSkills() bool {
-	return false
+	return true
 }
 
 func (a *Adapter) SupportsSystemPrompt() bool {
@@ -120,7 +118,7 @@ func (a *Adapter) SupportsSystemPrompt() bool {
 }
 
 func (a *Adapter) SupportsMCP() bool {
-	return false // VS Code Copilot MCP config is managed through VS Code UI, not files.
+	return true
 }
 
 // AgentNotInstallableError is returned when InstallCommand is called on a desktop-only agent.

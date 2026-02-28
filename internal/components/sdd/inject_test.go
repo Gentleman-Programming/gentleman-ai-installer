@@ -9,6 +9,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
 	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
+	// agents/cursor, agents/gemini, agents/vscode used via agents.NewAdapter()
 )
 
 func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
@@ -155,7 +156,7 @@ func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestInjectCursorWritesSkillsOnly(t *testing.T) {
+func TestInjectCursorWritesSDDOrchestratorAndSkills(t *testing.T) {
 	home := t.TempDir()
 
 	cursorAdapter, err := agents.NewAdapter("cursor")
@@ -168,8 +169,126 @@ func TestInjectCursorWritesSkillsOnly(t *testing.T) {
 		t.Fatalf("Inject(cursor) error = %v", injectErr)
 	}
 
-	// Cursor supports skills and system prompt, so it should write SDD skill files.
+	if !result.Changed {
+		t.Fatal("Inject(cursor) changed = false")
+	}
+
+	// Should have SDD skill files AND the system prompt file.
 	if len(result.Files) == 0 {
-		t.Fatal("Inject(cursor) returned no files — expected SDD skill files")
+		t.Fatal("Inject(cursor) returned no files")
+	}
+
+	// Verify SDD orchestrator was injected into the system prompt file.
+	promptPath := filepath.Join(home, ".cursor", "rules", "gentle-ai.mdc")
+	content, readErr := os.ReadFile(promptPath)
+	if readErr != nil {
+		t.Fatalf("ReadFile(%q) error = %v", promptPath, readErr)
+	}
+
+	text := string(content)
+	if !strings.Contains(text, "Spec-Driven Development") {
+		t.Fatal("Cursor system prompt missing SDD orchestrator content")
+	}
+	if !strings.Contains(text, "sub-agent") {
+		t.Fatal("Cursor system prompt missing SDD sub-agent references")
+	}
+}
+
+func TestInjectGeminiWritesSDDOrchestratorAndSkills(t *testing.T) {
+	home := t.TempDir()
+
+	geminiAdapter, err := agents.NewAdapter("gemini-cli")
+	if err != nil {
+		t.Fatalf("NewAdapter(gemini-cli) error = %v", err)
+	}
+
+	result, injectErr := Inject(home, geminiAdapter)
+	if injectErr != nil {
+		t.Fatalf("Inject(gemini) error = %v", injectErr)
+	}
+
+	if !result.Changed {
+		t.Fatal("Inject(gemini) changed = false")
+	}
+
+	// Verify SDD orchestrator was injected into GEMINI.md.
+	promptPath := filepath.Join(home, ".gemini", "GEMINI.md")
+	content, readErr := os.ReadFile(promptPath)
+	if readErr != nil {
+		t.Fatalf("ReadFile(%q) error = %v", promptPath, readErr)
+	}
+
+	text := string(content)
+	if !strings.Contains(text, "Spec-Driven Development") {
+		t.Fatal("Gemini system prompt missing SDD orchestrator content")
+	}
+
+	// Should also write SDD skill files.
+	skillPath := filepath.Join(home, ".gemini", "skills", "sdd-init", "SKILL.md")
+	if _, err := os.Stat(skillPath); err != nil {
+		t.Fatalf("expected SDD skill file %q: %v", skillPath, err)
+	}
+}
+
+func TestInjectVSCodeWritesSDDOrchestratorAndSkills(t *testing.T) {
+	home := t.TempDir()
+
+	vscodeAdapter, err := agents.NewAdapter("vscode-copilot")
+	if err != nil {
+		t.Fatalf("NewAdapter(vscode-copilot) error = %v", err)
+	}
+
+	result, injectErr := Inject(home, vscodeAdapter)
+	if injectErr != nil {
+		t.Fatalf("Inject(vscode) error = %v", injectErr)
+	}
+
+	if !result.Changed {
+		t.Fatal("Inject(vscode) changed = false")
+	}
+
+	// Verify SDD orchestrator was injected into copilot-instructions.md.
+	promptPath := filepath.Join(home, ".github", "copilot-instructions.md")
+	content, readErr := os.ReadFile(promptPath)
+	if readErr != nil {
+		t.Fatalf("ReadFile(%q) error = %v", promptPath, readErr)
+	}
+
+	text := string(content)
+	if !strings.Contains(text, "Spec-Driven Development") {
+		t.Fatal("VS Code system prompt missing SDD orchestrator content")
+	}
+
+	// Should also write SDD skill files under ~/.vscode/skills/.
+	skillPath := filepath.Join(home, ".vscode", "skills", "sdd-init", "SKILL.md")
+	if _, err := os.Stat(skillPath); err != nil {
+		t.Fatalf("expected SDD skill file %q: %v", skillPath, err)
+	}
+}
+
+func TestInjectFileAppendSkipsIfAlreadyPresent(t *testing.T) {
+	home := t.TempDir()
+
+	cursorAdapter, err := agents.NewAdapter("cursor")
+	if err != nil {
+		t.Fatalf("NewAdapter(cursor) error = %v", err)
+	}
+
+	// First injection.
+	first, firstErr := Inject(home, cursorAdapter)
+	if firstErr != nil {
+		t.Fatalf("Inject() first error = %v", firstErr)
+	}
+	if !first.Changed {
+		t.Fatal("first Inject() changed = false")
+	}
+
+	// Second injection — SDD content is already there, should not duplicate.
+	second, secondErr := Inject(home, cursorAdapter)
+	if secondErr != nil {
+		t.Fatalf("Inject() second error = %v", secondErr)
+	}
+	if second.Changed {
+		t.Fatal("second Inject() changed = true — SDD orchestrator was duplicated")
 	}
 }

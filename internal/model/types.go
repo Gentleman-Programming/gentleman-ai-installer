@@ -11,17 +11,14 @@ const (
 )
 
 // SupportTier indicates how fully an agent supports the Gentleman AI ecosystem.
+// All current agents receive the full SDD orchestrator, skill files, MCP config,
+// and system prompt injection. The tier is kept as metadata for display purposes.
 type SupportTier string
 
 const (
-	// TierFull supports sub-agent delegation, skills, MCP, and all features (Claude Code, OpenCode).
+	// TierFull — the agent receives all ecosystem features: SDD orchestrator,
+	// skill files, MCP servers, system prompt, and sub-agent delegation.
 	TierFull SupportTier = "full"
-	// TierGood supports inline skills, MCP, system prompts, but no sub-agent delegation (Gemini CLI).
-	TierGood SupportTier = "good"
-	// TierPartial supports system instructions and MCP, limited skill support (Cursor, VS Code Copilot).
-	TierPartial SupportTier = "partial"
-	// TierMinimal supports only persona via project rules.
-	TierMinimal SupportTier = "minimal"
 )
 
 type ComponentID string
