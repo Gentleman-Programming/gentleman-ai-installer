@@ -6,13 +6,18 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gentleman-programming/gentle-ai/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
 )
+
+func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
+func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
 
 func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 	home := t.TempDir()
 
-	first, err := Inject(home, model.AgentOpenCode)
+	first, err := Inject(home, opencodeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() first error = %v", err)
 	}
@@ -20,7 +25,7 @@ func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 		t.Fatalf("Inject() first changed = false")
 	}
 
-	second, err := Inject(home, model.AgentOpenCode)
+	second, err := Inject(home, opencodeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() second error = %v", err)
 	}
@@ -37,7 +42,7 @@ func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 func TestInjectAddsEnvToDenyList(t *testing.T) {
 	home := t.TempDir()
 
-	if _, err := Inject(home, model.AgentClaudeCode); err != nil {
+	if _, err := Inject(home, claudeAdapter()); err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
 

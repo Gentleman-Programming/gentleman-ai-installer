@@ -5,13 +5,18 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gentleman-programming/gentle-ai/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
 )
+
+func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
+func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
 
 func TestInjectOpenCodeMergesContext7AndIsIdempotent(t *testing.T) {
 	home := t.TempDir()
 
-	first, err := Inject(home, model.AgentOpenCode)
+	first, err := Inject(home, opencodeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() first error = %v", err)
 	}
@@ -19,7 +24,7 @@ func TestInjectOpenCodeMergesContext7AndIsIdempotent(t *testing.T) {
 		t.Fatalf("Inject() first changed = false")
 	}
 
-	second, err := Inject(home, model.AgentOpenCode)
+	second, err := Inject(home, opencodeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() second error = %v", err)
 	}
@@ -41,7 +46,7 @@ func TestInjectOpenCodeMergesContext7AndIsIdempotent(t *testing.T) {
 func TestInjectClaudeWritesContext7FileAndIsIdempotent(t *testing.T) {
 	home := t.TempDir()
 
-	first, err := Inject(home, model.AgentClaudeCode)
+	first, err := Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() first error = %v", err)
 	}
@@ -49,7 +54,7 @@ func TestInjectClaudeWritesContext7FileAndIsIdempotent(t *testing.T) {
 		t.Fatalf("Inject() first changed = false")
 	}
 
-	second, err := Inject(home, model.AgentClaudeCode)
+	second, err := Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() second error = %v", err)
 	}

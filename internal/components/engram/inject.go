@@ -3,8 +3,8 @@ package engram
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/internal/assets"
 	"github.com/gentleman-programming/gentle-ai/internal/components/filemerge"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
@@ -15,70 +15,84 @@ type InjectionResult struct {
 	Files   []string
 }
 
-// defaultEngramServerJSON is the MCP server config for Claude Code.
-// Placed at ~/.claude/mcp/engram.json — same pattern as context7.json.
+// defaultEngramServerJSON is the MCP server config for separate-file strategy.
 var defaultEngramServerJSON = []byte("{\n  \"command\": \"engram\",\n  \"args\": []\n}\n")
 
-// defaultEngramOverlayJSON is the settings.json overlay for OpenCode.
+// defaultEngramOverlayJSON is the settings.json overlay for merge strategy.
 var defaultEngramOverlayJSON = []byte("{\n  \"mcpServers\": {\n    \"engram\": {\n      \"command\": \"engram\",\n      \"args\": []\n    }\n  }\n}\n")
 
-func Inject(homeDir string, agent model.AgentID) (InjectionResult, error) {
-	switch agent {
-	case model.AgentClaudeCode:
-		return injectClaude(homeDir)
-	case model.AgentOpenCode:
-		return injectOpenCode(homeDir)
-	default:
-		return InjectionResult{}, fmt.Errorf("engram injector does not support agent %q", agent)
+func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
+	if !adapter.SupportsMCP() {
+		return InjectionResult{}, nil
 	}
-}
 
-func injectClaude(homeDir string) (InjectionResult, error) {
 	files := make([]string, 0, 2)
 	changed := false
 
-	// 1. Write MCP server config at ~/.claude/mcp/engram.json.
-	mcpPath := filepath.Join(homeDir, ".claude", "mcp", "engram.json")
-	mcpWrite, err := filemerge.WriteFileAtomic(mcpPath, defaultEngramServerJSON, 0o644)
-	if err != nil {
-		return InjectionResult{}, err
+	// 1. Write MCP server config using the adapter's strategy.
+	switch adapter.MCPStrategy() {
+	case model.StrategySeparateMCPFiles:
+		mcpPath := adapter.MCPConfigPath(homeDir, "engram")
+		mcpWrite, err := filemerge.WriteFileAtomic(mcpPath, defaultEngramServerJSON, 0o644)
+		if err != nil {
+			return InjectionResult{}, err
+		}
+		changed = changed || mcpWrite.Changed
+		files = append(files, mcpPath)
+
+	case model.StrategyMergeIntoSettings:
+		settingsPath := adapter.SettingsPath(homeDir)
+		if settingsPath == "" {
+			break
+		}
+		settingsWrite, err := mergeJSONFile(settingsPath, defaultEngramOverlayJSON)
+		if err != nil {
+			return InjectionResult{}, err
+		}
+		changed = changed || settingsWrite.Changed
+		files = append(files, settingsPath)
+
+	case model.StrategyMCPConfigFile:
+		mcpPath := adapter.MCPConfigPath(homeDir, "engram")
+		if mcpPath == "" {
+			break
+		}
+		mcpWrite, err := mergeJSONFile(mcpPath, defaultEngramOverlayJSON)
+		if err != nil {
+			return InjectionResult{}, err
+		}
+		changed = changed || mcpWrite.Changed
+		files = append(files, mcpPath)
 	}
-	changed = changed || mcpWrite.Changed
-	files = append(files, mcpPath)
 
-	// 2. Inject Engram memory protocol into CLAUDE.md.
-	claudeMDPath := filepath.Join(homeDir, ".claude", "CLAUDE.md")
-	protocolContent := assets.MustRead("claude/engram-protocol.md")
+	// 2. Inject Engram memory protocol into system prompt (if supported).
+	if adapter.SupportsSystemPrompt() {
+		switch adapter.SystemPromptStrategy() {
+		case model.StrategyMarkdownSections:
+			promptPath := adapter.SystemPromptFile(homeDir)
+			protocolContent := assets.MustRead("claude/engram-protocol.md")
 
-	existing, err := readFileOrEmpty(claudeMDPath)
-	if err != nil {
-		return InjectionResult{}, err
+			existing, err := readFileOrEmpty(promptPath)
+			if err != nil {
+				return InjectionResult{}, err
+			}
+
+			updated := filemerge.InjectMarkdownSection(existing, "engram-protocol", protocolContent)
+
+			mdWrite, err := filemerge.WriteFileAtomic(promptPath, []byte(updated), 0o644)
+			if err != nil {
+				return InjectionResult{}, err
+			}
+			changed = changed || mdWrite.Changed
+			files = append(files, promptPath)
+
+		default:
+			// For FileReplace/AppendToFile strategies, the engram protocol
+			// is embedded in the persona content — no separate injection needed.
+		}
 	}
-
-	updated := filemerge.InjectMarkdownSection(existing, "engram-protocol", protocolContent)
-
-	mdWrite, err := filemerge.WriteFileAtomic(claudeMDPath, []byte(updated), 0o644)
-	if err != nil {
-		return InjectionResult{}, err
-	}
-	changed = changed || mdWrite.Changed
-	files = append(files, claudeMDPath)
 
 	return InjectionResult{Changed: changed, Files: files}, nil
-}
-
-func injectOpenCode(homeDir string) (InjectionResult, error) {
-	// Merge engram into mcpServers in settings.json — same pattern as context7.
-	settingsPath := filepath.Join(homeDir, ".config", "opencode", "settings.json")
-	settingsWrite, err := mergeJSONFile(settingsPath, defaultEngramOverlayJSON)
-	if err != nil {
-		return InjectionResult{}, err
-	}
-
-	return InjectionResult{
-		Changed: settingsWrite.Changed,
-		Files:   []string{settingsPath},
-	}, nil
 }
 
 func mergeJSONFile(path string, overlay []byte) (filemerge.WriteResult, error) {

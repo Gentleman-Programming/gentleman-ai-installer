@@ -5,13 +5,16 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gentleman-programming/gentle-ai/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
 )
+
+func claudeAdapter() agents.Adapter { return claude.NewAdapter() }
 
 func TestInjectClaudeIsIdempotent(t *testing.T) {
 	home := t.TempDir()
 
-	first, err := Inject(home, model.AgentClaudeCode)
+	first, err := Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() first error = %v", err)
 	}
@@ -19,7 +22,7 @@ func TestInjectClaudeIsIdempotent(t *testing.T) {
 		t.Fatalf("Inject() first changed = false")
 	}
 
-	second, err := Inject(home, model.AgentClaudeCode)
+	second, err := Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() second error = %v", err)
 	}

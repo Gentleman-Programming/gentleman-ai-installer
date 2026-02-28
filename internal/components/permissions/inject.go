@@ -3,10 +3,9 @@ package permissions
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/internal/components/filemerge"
-	"github.com/gentleman-programming/gentle-ai/internal/model"
 )
 
 type InjectionResult struct {
@@ -16,10 +15,10 @@ type InjectionResult struct {
 
 var permissionsOverlayJSON = []byte("{\n  \"permissions\": {\n    \"defaultMode\": \"ask\",\n    \"deny\": [\n      \"rm -rf /\",\n      \"sudo rm -rf /\",\n      \".env\"\n    ]\n  }\n}\n")
 
-func Inject(homeDir string, agent model.AgentID) (InjectionResult, error) {
-	settingsPath, err := settingsPathForAgent(homeDir, agent)
-	if err != nil {
-		return InjectionResult{}, err
+func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
+	settingsPath := adapter.SettingsPath(homeDir)
+	if settingsPath == "" {
+		return InjectionResult{}, nil
 	}
 
 	writeResult, err := mergeJSONFile(settingsPath, permissionsOverlayJSON)
@@ -28,17 +27,6 @@ func Inject(homeDir string, agent model.AgentID) (InjectionResult, error) {
 	}
 
 	return InjectionResult{Changed: writeResult.Changed, Files: []string{settingsPath}}, nil
-}
-
-func settingsPathForAgent(homeDir string, agent model.AgentID) (string, error) {
-	switch agent {
-	case model.AgentClaudeCode:
-		return filepath.Join(homeDir, ".claude", "settings.json"), nil
-	case model.AgentOpenCode:
-		return filepath.Join(homeDir, ".config", "opencode", "settings.json"), nil
-	default:
-		return "", fmt.Errorf("permissions injector does not support agent %q", agent)
-	}
 }
 
 func mergeJSONFile(path string, overlay []byte) (filemerge.WriteResult, error) {

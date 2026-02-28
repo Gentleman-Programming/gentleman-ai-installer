@@ -6,13 +6,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gentleman-programming/gentle-ai/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
 )
+
+func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
+func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
 
 func TestInjectClaudeWritesSectionMarkers(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentClaudeCode)
+	result, err := Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -34,7 +39,6 @@ func TestInjectClaudeWritesSectionMarkers(t *testing.T) {
 	if !strings.Contains(text, "<!-- /gentle-ai:sdd-orchestrator -->") {
 		t.Fatal("CLAUDE.md missing close marker for sdd-orchestrator")
 	}
-	// Real content checks — the embedded asset has these patterns.
 	if !strings.Contains(text, "sub-agent") {
 		t.Fatal("CLAUDE.md missing real SDD orchestrator content (expected 'sub-agent')")
 	}
@@ -55,7 +59,7 @@ func TestInjectClaudePreservesExistingSections(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	_, err := Inject(home, model.AgentClaudeCode)
+	_, err := Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -77,7 +81,7 @@ func TestInjectClaudePreservesExistingSections(t *testing.T) {
 func TestInjectClaudeIsIdempotent(t *testing.T) {
 	home := t.TempDir()
 
-	first, err := Inject(home, model.AgentClaudeCode)
+	first, err := Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() first error = %v", err)
 	}
@@ -85,7 +89,7 @@ func TestInjectClaudeIsIdempotent(t *testing.T) {
 		t.Fatalf("Inject() first changed = false")
 	}
 
-	second, err := Inject(home, model.AgentClaudeCode)
+	second, err := Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() second error = %v", err)
 	}
@@ -97,7 +101,7 @@ func TestInjectClaudeIsIdempotent(t *testing.T) {
 func TestInjectOpenCodeWritesCommandFiles(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentOpenCode)
+	result, err := Inject(home, opencodeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -105,12 +109,10 @@ func TestInjectOpenCodeWritesCommandFiles(t *testing.T) {
 		t.Fatalf("Inject() first changed = false")
 	}
 
-	// Should have command files + SDD skill files.
 	if len(result.Files) == 0 {
 		t.Fatal("Inject() returned no files")
 	}
 
-	// Check a command file has real content.
 	commandPath := filepath.Join(home, ".config", "opencode", "commands", "sdd-init.md")
 	content, err := os.ReadFile(commandPath)
 	if err != nil {
@@ -122,7 +124,6 @@ func TestInjectOpenCodeWritesCommandFiles(t *testing.T) {
 		t.Fatal("sdd-init.md missing frontmatter description — not real content")
 	}
 
-	// Check a skill file was written.
 	skillPath := filepath.Join(home, ".config", "opencode", "skill", "sdd-init", "SKILL.md")
 	skillContent, err := os.ReadFile(skillPath)
 	if err != nil {
@@ -137,7 +138,7 @@ func TestInjectOpenCodeWritesCommandFiles(t *testing.T) {
 func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 	home := t.TempDir()
 
-	first, err := Inject(home, model.AgentOpenCode)
+	first, err := Inject(home, opencodeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() first error = %v", err)
 	}
@@ -145,7 +146,7 @@ func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 		t.Fatalf("Inject() first changed = false")
 	}
 
-	second, err := Inject(home, model.AgentOpenCode)
+	second, err := Inject(home, opencodeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() second error = %v", err)
 	}
@@ -154,11 +155,21 @@ func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestInjectUnsupportedAgentReturnsError(t *testing.T) {
+func TestInjectCursorWritesSkillsOnly(t *testing.T) {
 	home := t.TempDir()
 
-	_, err := Inject(home, model.AgentID("cursor"))
-	if err == nil {
-		t.Fatal("expected error for unsupported agent")
+	cursorAdapter, err := agents.NewAdapter("cursor")
+	if err != nil {
+		t.Fatalf("NewAdapter(cursor) error = %v", err)
+	}
+
+	result, injectErr := Inject(home, cursorAdapter)
+	if injectErr != nil {
+		t.Fatalf("Inject(cursor) error = %v", injectErr)
+	}
+
+	// Cursor supports skills and system prompt, so it should write SDD skill files.
+	if len(result.Files) == 0 {
+		t.Fatal("Inject(cursor) returned no files — expected SDD skill files")
 	}
 }

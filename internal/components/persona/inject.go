@@ -3,8 +3,8 @@ package persona
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/internal/assets"
 	"github.com/gentleman-programming/gentle-ai/internal/components/filemerge"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
@@ -20,40 +20,12 @@ const neutralPersonaContent = "Be helpful, direct, and technically precise. Focu
 // outputStyleOverlayJSON is the settings.json overlay to enable the Gentleman output style.
 var outputStyleOverlayJSON = []byte("{\n  \"outputStyle\": \"Gentleman\"\n}\n")
 
-func Inject(homeDir string, agent model.AgentID, persona model.PersonaID) (InjectionResult, error) {
-	switch agent {
-	case model.AgentClaudeCode:
-		return injectClaude(homeDir, persona)
-	case model.AgentOpenCode:
-		return injectOpenCode(homeDir, persona)
-	default:
-		return InjectionResult{}, fmt.Errorf("persona injector does not support agent %q", agent)
+func Inject(homeDir string, adapter agents.Adapter, persona model.PersonaID) (InjectionResult, error) {
+	if !adapter.SupportsSystemPrompt() {
+		return InjectionResult{}, nil
 	}
-}
 
-func personaContent(agent model.AgentID, persona model.PersonaID) string {
-	switch persona {
-	case model.PersonaNeutral:
-		return neutralPersonaContent
-	case model.PersonaCustom:
-		// Custom persona does nothing — the user keeps their own personality.
-		// The SDD orchestrator is injected separately by the SDD component.
-		return ""
-	default:
-		// Gentleman persona — read from embedded assets.
-		switch agent {
-		case model.AgentClaudeCode:
-			return assets.MustRead("claude/persona-gentleman.md")
-		case model.AgentOpenCode:
-			return assets.MustRead("opencode/persona-gentleman.md")
-		default:
-			return neutralPersonaContent
-		}
-	}
-}
-
-func injectClaude(homeDir string, persona model.PersonaID) (InjectionResult, error) {
-	// Custom persona does nothing — user keeps their own CLAUDE.md content.
+	// Custom persona does nothing — user keeps their own config.
 	if persona == model.PersonaCustom {
 		return InjectionResult{}, nil
 	}
@@ -61,64 +33,96 @@ func injectClaude(homeDir string, persona model.PersonaID) (InjectionResult, err
 	files := make([]string, 0, 3)
 	changed := false
 
-	// 1. Inject persona content into CLAUDE.md section.
-	claudeMDPath := filepath.Join(homeDir, ".claude", "CLAUDE.md")
-	content := personaContent(model.AgentClaudeCode, persona)
-
-	existing, err := readFileOrEmpty(claudeMDPath)
-	if err != nil {
-		return InjectionResult{}, err
+	content := personaContent(adapter.Agent(), persona)
+	if content == "" {
+		return InjectionResult{}, nil
 	}
 
-	updated := filemerge.InjectMarkdownSection(existing, "persona", content)
-
-	writeResult, err := filemerge.WriteFileAtomic(claudeMDPath, []byte(updated), 0o644)
-	if err != nil {
-		return InjectionResult{}, err
-	}
-	changed = changed || writeResult.Changed
-	files = append(files, claudeMDPath)
-
-	// 2. Gentleman-only: write output-style file and merge outputStyle into settings.json.
-	if persona == model.PersonaGentleman {
-		outputStylePath := filepath.Join(homeDir, ".claude", "output-styles", "gentleman.md")
-		outputStyleContent := assets.MustRead("claude/output-style-gentleman.md")
-
-		styleResult, err := filemerge.WriteFileAtomic(outputStylePath, []byte(outputStyleContent), 0o644)
+	// 1. Inject persona content based on system prompt strategy.
+	switch adapter.SystemPromptStrategy() {
+	case model.StrategyMarkdownSections:
+		promptPath := adapter.SystemPromptFile(homeDir)
+		existing, err := readFileOrEmpty(promptPath)
 		if err != nil {
 			return InjectionResult{}, err
 		}
-		changed = changed || styleResult.Changed
-		files = append(files, outputStylePath)
 
-		// Merge "outputStyle": "Gentleman" into ~/.claude/settings.json.
-		settingsPath := filepath.Join(homeDir, ".claude", "settings.json")
-		settingsResult, err := mergeJSONFile(settingsPath, outputStyleOverlayJSON)
+		updated := filemerge.InjectMarkdownSection(existing, "persona", content)
+
+		writeResult, err := filemerge.WriteFileAtomic(promptPath, []byte(updated), 0o644)
 		if err != nil {
 			return InjectionResult{}, err
 		}
-		changed = changed || settingsResult.Changed
-		files = append(files, settingsPath)
+		changed = changed || writeResult.Changed
+		files = append(files, promptPath)
+
+	case model.StrategyFileReplace:
+		promptPath := adapter.SystemPromptFile(homeDir)
+		writeResult, err := filemerge.WriteFileAtomic(promptPath, []byte(content), 0o644)
+		if err != nil {
+			return InjectionResult{}, err
+		}
+		changed = changed || writeResult.Changed
+		files = append(files, promptPath)
+
+	case model.StrategyAppendToFile:
+		promptPath := adapter.SystemPromptFile(homeDir)
+		writeResult, err := filemerge.WriteFileAtomic(promptPath, []byte(content), 0o644)
+		if err != nil {
+			return InjectionResult{}, err
+		}
+		changed = changed || writeResult.Changed
+		files = append(files, promptPath)
+	}
+
+	// 2. Gentleman-only: write output style + merge into settings (if agent supports it).
+	if persona == model.PersonaGentleman && adapter.SupportsOutputStyles() {
+		outputStyleDir := adapter.OutputStyleDir(homeDir)
+		if outputStyleDir != "" {
+			outputStylePath := outputStyleDir + "/gentleman.md"
+			outputStyleContent := assets.MustRead("claude/output-style-gentleman.md")
+
+			styleResult, err := filemerge.WriteFileAtomic(outputStylePath, []byte(outputStyleContent), 0o644)
+			if err != nil {
+				return InjectionResult{}, err
+			}
+			changed = changed || styleResult.Changed
+			files = append(files, outputStylePath)
+		}
+
+		// Merge "outputStyle": "Gentleman" into settings.
+		settingsPath := adapter.SettingsPath(homeDir)
+		if settingsPath != "" {
+			settingsResult, err := mergeJSONFile(settingsPath, outputStyleOverlayJSON)
+			if err != nil {
+				return InjectionResult{}, err
+			}
+			changed = changed || settingsResult.Changed
+			files = append(files, settingsPath)
+		}
 	}
 
 	return InjectionResult{Changed: changed, Files: files}, nil
 }
 
-func injectOpenCode(homeDir string, persona model.PersonaID) (InjectionResult, error) {
-	// Custom persona does nothing — user keeps their own AGENTS.md content.
-	if persona == model.PersonaCustom {
-		return InjectionResult{}, nil
+func personaContent(agent model.AgentID, persona model.PersonaID) string {
+	switch persona {
+	case model.PersonaNeutral:
+		return neutralPersonaContent
+	case model.PersonaCustom:
+		return ""
+	default:
+		// Gentleman persona — try agent-specific asset, then fallback.
+		switch agent {
+		case model.AgentClaudeCode:
+			return assets.MustRead("claude/persona-gentleman.md")
+		case model.AgentOpenCode:
+			return assets.MustRead("opencode/persona-gentleman.md")
+		default:
+			// For agents without a specific persona asset, use neutral content.
+			return neutralPersonaContent
+		}
 	}
-
-	content := personaContent(model.AgentOpenCode, persona)
-	agentsPath := filepath.Join(homeDir, ".config", "opencode", "AGENTS.md")
-
-	writeResult, err := filemerge.WriteFileAtomic(agentsPath, []byte(content), 0o644)
-	if err != nil {
-		return InjectionResult{}, err
-	}
-
-	return InjectionResult{Changed: writeResult.Changed, Files: []string{agentsPath}}, nil
 }
 
 func mergeJSONFile(path string, overlay []byte) (filemerge.WriteResult, error) {

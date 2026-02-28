@@ -13,9 +13,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         sudo \
         ca-certificates \
         build-essential \
-        nodejs \
-        npm \
     && rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------------
+# Install Node.js LTS via NodeSource (Ubuntu 22.04 repos ship Node 12.x)
+# ---------------------------------------------------------------------------
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
+    apt-get install -y nodejs
 
 # ---------------------------------------------------------------------------
 # Install Go (match go.mod version)

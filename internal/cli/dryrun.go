@@ -6,6 +6,7 @@ import (
 
 	"github.com/gentleman-programming/gentle-ai/internal/model"
 	"github.com/gentleman-programming/gentle-ai/internal/planner"
+	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
 
 func RenderDryRun(result InstallResult) string {
@@ -22,6 +23,11 @@ func RenderDryRun(result InstallResult) string {
 	_, _ = fmt.Fprintf(b, "Platform decision: %s\n", formatPlatformDecision(result.Review.PlatformDecision))
 	_, _ = fmt.Fprintf(b, "Prepare steps: %d\n", len(result.Plan.Prepare))
 	_, _ = fmt.Fprintf(b, "Apply steps: %d\n", len(result.Plan.Apply))
+
+	if len(result.Dependencies.Dependencies) > 0 {
+		_, _ = fmt.Fprintln(b, "")
+		_, _ = fmt.Fprintln(b, system.RenderDependencyReport(result.Dependencies))
+	}
 
 	return strings.TrimRight(b.String(), "\n")
 }

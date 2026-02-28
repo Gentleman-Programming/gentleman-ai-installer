@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/internal/components/engram"
 	"github.com/gentleman-programming/gentle-ai/internal/components/mcp"
 	"github.com/gentleman-programming/gentle-ai/internal/components/persona"
@@ -16,6 +19,9 @@ import (
 )
 
 var update = flag.Bool("update", false, "update golden files")
+
+func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
+func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
 
 // ---------------------------------------------------------------------------
 // Existing golden tests (context7, presets, SDD command)
@@ -69,7 +75,7 @@ func TestGoldenConfigs(t *testing.T) {
 func TestGoldenSDD_Claude(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := sdd.Inject(home, model.AgentClaudeCode)
+	result, err := sdd.Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("sdd.Inject(claude) error = %v", err)
 	}
@@ -84,7 +90,7 @@ func TestGoldenSDD_Claude(t *testing.T) {
 func TestGoldenSDD_OpenCode(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := sdd.Inject(home, model.AgentOpenCode)
+	result, err := sdd.Inject(home, opencodeAdapter())
 	if err != nil {
 		t.Fatalf("sdd.Inject(opencode) error = %v", err)
 	}
@@ -121,7 +127,7 @@ func TestGoldenSDD_OpenCode(t *testing.T) {
 func TestGoldenPersona_Claude_Gentleman(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := persona.Inject(home, model.AgentClaudeCode, model.PersonaGentleman)
+	result, err := persona.Inject(home, claudeAdapter(), model.PersonaGentleman)
 	if err != nil {
 		t.Fatalf("persona.Inject(claude, gentleman) error = %v", err)
 	}
@@ -142,7 +148,7 @@ func TestGoldenPersona_Claude_Gentleman(t *testing.T) {
 func TestGoldenPersona_Claude_Neutral(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := persona.Inject(home, model.AgentClaudeCode, model.PersonaNeutral)
+	result, err := persona.Inject(home, claudeAdapter(), model.PersonaNeutral)
 	if err != nil {
 		t.Fatalf("persona.Inject(claude, neutral) error = %v", err)
 	}
@@ -157,7 +163,7 @@ func TestGoldenPersona_Claude_Neutral(t *testing.T) {
 func TestGoldenPersona_OpenCode_Gentleman(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := persona.Inject(home, model.AgentOpenCode, model.PersonaGentleman)
+	result, err := persona.Inject(home, opencodeAdapter(), model.PersonaGentleman)
 	if err != nil {
 		t.Fatalf("persona.Inject(opencode, gentleman) error = %v", err)
 	}
@@ -172,7 +178,7 @@ func TestGoldenPersona_OpenCode_Gentleman(t *testing.T) {
 func TestGoldenPersona_OpenCode_Neutral(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := persona.Inject(home, model.AgentOpenCode, model.PersonaNeutral)
+	result, err := persona.Inject(home, opencodeAdapter(), model.PersonaNeutral)
 	if err != nil {
 		t.Fatalf("persona.Inject(opencode, neutral) error = %v", err)
 	}
@@ -187,7 +193,7 @@ func TestGoldenPersona_OpenCode_Neutral(t *testing.T) {
 func TestGoldenPersona_Claude_Custom(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := persona.Inject(home, model.AgentClaudeCode, model.PersonaCustom)
+	result, err := persona.Inject(home, claudeAdapter(), model.PersonaCustom)
 	if err != nil {
 		t.Fatalf("persona.Inject(claude, custom) error = %v", err)
 	}
@@ -203,7 +209,7 @@ func TestGoldenPersona_Claude_Custom(t *testing.T) {
 func TestGoldenPersona_OpenCode_Custom(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := persona.Inject(home, model.AgentOpenCode, model.PersonaCustom)
+	result, err := persona.Inject(home, opencodeAdapter(), model.PersonaCustom)
 	if err != nil {
 		t.Fatalf("persona.Inject(opencode, custom) error = %v", err)
 	}
@@ -223,7 +229,7 @@ func TestGoldenPersona_OpenCode_Custom(t *testing.T) {
 func TestGoldenEngram_Claude(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := engram.Inject(home, model.AgentClaudeCode)
+	result, err := engram.Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("engram.Inject(claude) error = %v", err)
 	}
@@ -243,7 +249,7 @@ func TestGoldenEngram_Claude(t *testing.T) {
 func TestGoldenEngram_OpenCode(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := engram.Inject(home, model.AgentOpenCode)
+	result, err := engram.Inject(home, opencodeAdapter())
 	if err != nil {
 		t.Fatalf("engram.Inject(opencode) error = %v", err)
 	}
@@ -263,7 +269,7 @@ func TestGoldenSkills_Claude(t *testing.T) {
 	home := t.TempDir()
 
 	skillIDs := []model.SkillID{model.SkillTypeScript, model.SkillReact19}
-	result, err := skills.Inject(home, model.AgentClaudeCode, skillIDs)
+	result, err := skills.Inject(home, claudeAdapter(), skillIDs)
 	if err != nil {
 		t.Fatalf("skills.Inject(claude) error = %v", err)
 	}
@@ -282,7 +288,7 @@ func TestGoldenSkills_OpenCode(t *testing.T) {
 	home := t.TempDir()
 
 	skillIDs := []model.SkillID{model.SkillTypeScript, model.SkillReact19}
-	result, err := skills.Inject(home, model.AgentOpenCode, skillIDs)
+	result, err := skills.Inject(home, opencodeAdapter(), skillIDs)
 	if err != nil {
 		t.Fatalf("skills.Inject(opencode) error = %v", err)
 	}
@@ -305,13 +311,13 @@ func TestGoldenCombined_Claude(t *testing.T) {
 	home := t.TempDir()
 
 	// Inject persona first, then SDD, then Engram — all write sections into CLAUDE.md.
-	if _, err := persona.Inject(home, model.AgentClaudeCode, model.PersonaGentleman); err != nil {
+	if _, err := persona.Inject(home, claudeAdapter(), model.PersonaGentleman); err != nil {
 		t.Fatalf("persona.Inject error = %v", err)
 	}
-	if _, err := sdd.Inject(home, model.AgentClaudeCode); err != nil {
+	if _, err := sdd.Inject(home, claudeAdapter()); err != nil {
 		t.Fatalf("sdd.Inject error = %v", err)
 	}
-	if _, err := engram.Inject(home, model.AgentClaudeCode); err != nil {
+	if _, err := engram.Inject(home, claudeAdapter()); err != nil {
 		t.Fatalf("engram.Inject error = %v", err)
 	}
 

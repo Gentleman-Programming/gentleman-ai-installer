@@ -1,4 +1,4 @@
-package claude
+package gemini
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/gentleman-programming/gentle-ai/internal/installcmd"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
@@ -19,33 +18,31 @@ type statResult struct {
 type Adapter struct {
 	lookPath func(string) (string, error)
 	statPath func(string) statResult
-	resolver installcmd.Resolver
 }
 
 func NewAdapter() *Adapter {
 	return &Adapter{
 		lookPath: exec.LookPath,
 		statPath: defaultStat,
-		resolver: installcmd.NewResolver(),
 	}
 }
 
 // --- Identity ---
 
 func (a *Adapter) Agent() model.AgentID {
-	return model.AgentClaudeCode
+	return model.AgentGeminiCLI
 }
 
 func (a *Adapter) Tier() model.SupportTier {
-	return model.TierFull
+	return model.TierGood
 }
 
 // --- Detection ---
 
 func (a *Adapter) Detect(_ context.Context, homeDir string) (bool, string, string, bool, error) {
-	configPath := ConfigPath(homeDir)
+	configPath := filepath.Join(homeDir, ".gemini")
 
-	binaryPath, err := a.lookPath("claude")
+	binaryPath, err := a.lookPath("gemini")
 	installed := err == nil
 
 	stat := a.statPath(configPath)
@@ -66,56 +63,55 @@ func (a *Adapter) SupportsAutoInstall() bool {
 }
 
 func (a *Adapter) InstallCommand(profile system.PlatformProfile) ([][]string, error) {
-	resolver := a.resolver
-	if resolver == nil {
-		resolver = installcmd.NewResolver()
+	// Gemini CLI installs via npm on all platforms.
+	if profile.OS == "linux" {
+		return [][]string{{"sudo", "npm", "install", "-g", "@anthropic-ai/gemini-cli"}}, nil
 	}
-
-	return resolver.ResolveAgentInstall(profile, a.Agent())
+	return [][]string{{"npm", "install", "-g", "@google/gemini-cli"}}, nil
 }
 
 // --- Config paths ---
 
 func (a *Adapter) GlobalConfigDir(homeDir string) string {
-	return filepath.Join(homeDir, ".claude")
+	return filepath.Join(homeDir, ".gemini")
 }
 
 func (a *Adapter) SystemPromptFile(homeDir string) string {
-	return filepath.Join(homeDir, ".claude", "CLAUDE.md")
+	return filepath.Join(homeDir, ".gemini", "GEMINI.md")
 }
 
 func (a *Adapter) SkillsDir(homeDir string) string {
-	return filepath.Join(homeDir, ".claude", "skills")
+	return filepath.Join(homeDir, ".gemini", "skills")
 }
 
 func (a *Adapter) SettingsPath(homeDir string) string {
-	return filepath.Join(homeDir, ".claude", "settings.json")
+	return filepath.Join(homeDir, ".gemini", "settings.json")
 }
 
 // --- Config strategies ---
 
 func (a *Adapter) SystemPromptStrategy() model.SystemPromptStrategy {
-	return model.StrategyMarkdownSections
+	return model.StrategyFileReplace
 }
 
 func (a *Adapter) MCPStrategy() model.MCPStrategy {
-	return model.StrategySeparateMCPFiles
+	return model.StrategyMergeIntoSettings
 }
 
 // --- MCP ---
 
-func (a *Adapter) MCPConfigPath(homeDir string, serverName string) string {
-	return filepath.Join(homeDir, ".claude", "mcp", serverName+".json")
+func (a *Adapter) MCPConfigPath(homeDir string, _ string) string {
+	return filepath.Join(homeDir, ".gemini", "settings.json")
 }
 
 // --- Optional capabilities ---
 
 func (a *Adapter) SupportsOutputStyles() bool {
-	return true
+	return false
 }
 
-func (a *Adapter) OutputStyleDir(homeDir string) string {
-	return filepath.Join(homeDir, ".claude", "output-styles")
+func (a *Adapter) OutputStyleDir(_ string) string {
+	return ""
 }
 
 func (a *Adapter) SupportsSlashCommands() bool {

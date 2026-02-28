@@ -181,6 +181,7 @@ func TestBuildProgressLabelsFromResolvedPlan(t *testing.T) {
 	labels := buildProgressLabels(resolved)
 
 	want := []string{
+		"prepare:check-dependencies",
 		"prepare:backup-snapshot",
 		"apply:rollback-restore",
 		"agent:claude-code",

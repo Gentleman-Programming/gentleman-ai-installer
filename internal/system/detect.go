@@ -30,9 +30,10 @@ const (
 )
 
 type DetectionResult struct {
-	System  SystemInfo
-	Tools   map[string]ToolStatus
-	Configs []ConfigState
+	System       SystemInfo
+	Tools        map[string]ToolStatus
+	Configs      []ConfigState
+	Dependencies DependencyReport
 }
 
 func IsSupportedOS(goos string) bool {
@@ -49,7 +50,10 @@ func Detect(ctx context.Context) (DetectionResult, error) {
 	configs := ScanConfigs(homeDir)
 	osReleaseContent, _ := osReleaseContent(runtime.GOOS)
 
-	return detectFromInputs(runtime.GOOS, runtime.GOARCH, os.Getenv("SHELL"), osReleaseContent, tools, configs), nil
+	result := detectFromInputs(runtime.GOOS, runtime.GOARCH, os.Getenv("SHELL"), osReleaseContent, tools, configs)
+	result.Dependencies = DetectDependencies(ctx, result.System.Profile)
+
+	return result, nil
 }
 
 func detectFromInputs(goos, arch, shell, linuxOSRelease string, tools map[string]ToolStatus, configs []ConfigState) DetectionResult {

@@ -60,6 +60,45 @@ func RenderDetection(result system.DetectionResult, cursor int) string {
 		b.WriteString("\n")
 	}
 
+	if len(result.Dependencies.Dependencies) > 0 {
+		b.WriteString(styles.HeadingStyle.Render("Dependencies"))
+		b.WriteString("\n")
+		for _, dep := range result.Dependencies.Dependencies {
+			var indicator string
+			if dep.Installed {
+				version := dep.Version
+				if version == "" {
+					version = "found"
+				}
+				indicator = styles.SuccessStyle.Render(version)
+			} else {
+				label := "not found"
+				if dep.Required {
+					label = "NOT FOUND (required)"
+				}
+				indicator = styles.ErrorStyle.Render(label)
+			}
+
+			suffix := ""
+			if !dep.Required {
+				suffix = styles.SubtextStyle.Render(" (optional)")
+			}
+
+			b.WriteString(fmt.Sprintf("  %s: %s%s\n",
+				styles.UnselectedStyle.Render(dep.Name), indicator, suffix))
+		}
+
+		if len(result.Dependencies.MissingRequired) > 0 {
+			b.WriteString("\n")
+			b.WriteString(styles.WarningStyle.Render(
+				fmt.Sprintf("Missing required: %s",
+					strings.Join(result.Dependencies.MissingRequired, ", "))))
+			b.WriteString("\n")
+		}
+
+		b.WriteString("\n")
+	}
+
 	if len(result.Configs) > 0 {
 		b.WriteString(styles.HeadingStyle.Render("Detected Configs"))
 		b.WriteString("\n")

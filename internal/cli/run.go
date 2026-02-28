@@ -27,13 +27,14 @@ import (
 )
 
 type InstallResult struct {
-	Selection model.Selection
-	Resolved  planner.ResolvedPlan
-	Review    planner.ReviewPayload
-	Plan      pipeline.StagePlan
-	Execution pipeline.ExecutionResult
-	Verify    verify.Report
-	DryRun    bool
+	Selection    model.Selection
+	Resolved     planner.ResolvedPlan
+	Review       planner.ReviewPayload
+	Plan         pipeline.StagePlan
+	Execution    pipeline.ExecutionResult
+	Verify       verify.Report
+	Dependencies system.DependencyReport
+	DryRun       bool
 }
 
 var (
@@ -63,11 +64,12 @@ func RunInstall(args []string, detection system.DetectionResult) (InstallResult,
 	stagePlan := buildStagePlan(input.Selection, resolved)
 
 	result := InstallResult{
-		Selection: input.Selection,
-		Resolved:  resolved,
-		Review:    review,
-		Plan:      stagePlan,
-		DryRun:    input.DryRun,
+		Selection:    input.Selection,
+		Resolved:     resolved,
+		Review:       review,
+		Plan:         stagePlan,
+		Dependencies: detection.Dependencies,
+		DryRun:       input.DryRun,
 	}
 
 	if input.DryRun {
@@ -102,7 +104,10 @@ func RunInstall(args []string, detection system.DetectionResult) (InstallResult,
 }
 
 func buildStagePlan(selection model.Selection, resolved planner.ResolvedPlan) pipeline.StagePlan {
-	prepare := []pipeline.Step{noopStep{id: "prepare:system-check"}}
+	prepare := []pipeline.Step{
+		noopStep{id: "prepare:system-check"},
+		noopStep{id: "prepare:check-dependencies"},
+	}
 	apply := make([]pipeline.Step, 0, len(resolved.Agents)+len(resolved.OrderedComponents))
 
 	for _, agent := range resolved.Agents {
@@ -152,6 +157,7 @@ func newInstallRuntime(homeDir string, selection model.Selection, resolved plann
 func (r *installRuntime) stagePlan() pipeline.StagePlan {
 	targets := backupTargets(r.homeDir, r.selection, r.resolved)
 	prepare := []pipeline.Step{
+		checkDependenciesStep{id: "prepare:check-dependencies", profile: r.profile},
 		prepareBackupStep{
 			id:          "prepare:backup-snapshot",
 			snapshotter: backup.NewSnapshotter(),
@@ -241,6 +247,10 @@ func (s agentInstallStep) Run() error {
 		return fmt.Errorf("create adapter for %q: %w", s.agent, err)
 	}
 
+	if !adapter.SupportsAutoInstall() {
+		return nil
+	}
+
 	commands, err := adapter.InstallCommand(s.profile)
 	if err != nil {
 		return fmt.Errorf("resolve install command for %q: %w", s.agent, err)
@@ -262,7 +272,22 @@ func (s componentApplyStep) ID() string {
 	return s.id
 }
 
+// resolveAdapters creates adapters for each agent ID, skipping unsupported ones.
+func resolveAdapters(agentIDs []model.AgentID) []agents.Adapter {
+	adapters := make([]agents.Adapter, 0, len(agentIDs))
+	for _, id := range agentIDs {
+		adapter, err := agents.NewAdapter(id)
+		if err != nil {
+			continue
+		}
+		adapters = append(adapters, adapter)
+	}
+	return adapters
+}
+
 func (s componentApplyStep) Run() error {
+	adapters := resolveAdapters(s.agents)
+
 	switch s.component {
 	case model.ComponentEngram:
 		commands, err := engram.InstallCommand(s.profile)
@@ -272,37 +297,37 @@ func (s componentApplyStep) Run() error {
 		if err := runCommandSequence(commands); err != nil {
 			return err
 		}
-		for _, agent := range s.agents {
-			if _, err := engram.Inject(s.homeDir, agent); err != nil {
-				return fmt.Errorf("inject engram for %q: %w", agent, err)
+		for _, adapter := range adapters {
+			if _, err := engram.Inject(s.homeDir, adapter); err != nil {
+				return fmt.Errorf("inject engram for %q: %w", adapter.Agent(), err)
 			}
 		}
 		return nil
 	case model.ComponentContext7:
-		for _, agent := range s.agents {
-			if _, err := mcp.Inject(s.homeDir, agent); err != nil {
-				return fmt.Errorf("inject context7 for %q: %w", agent, err)
+		for _, adapter := range adapters {
+			if _, err := mcp.Inject(s.homeDir, adapter); err != nil {
+				return fmt.Errorf("inject context7 for %q: %w", adapter.Agent(), err)
 			}
 		}
 		return nil
 	case model.ComponentPersona:
-		for _, agent := range s.agents {
-			if _, err := persona.Inject(s.homeDir, agent, s.selection.Persona); err != nil {
-				return fmt.Errorf("inject persona for %q: %w", agent, err)
+		for _, adapter := range adapters {
+			if _, err := persona.Inject(s.homeDir, adapter, s.selection.Persona); err != nil {
+				return fmt.Errorf("inject persona for %q: %w", adapter.Agent(), err)
 			}
 		}
 		return nil
 	case model.ComponentPermission:
-		for _, agent := range s.agents {
-			if _, err := permissions.Inject(s.homeDir, agent); err != nil {
-				return fmt.Errorf("inject permissions for %q: %w", agent, err)
+		for _, adapter := range adapters {
+			if _, err := permissions.Inject(s.homeDir, adapter); err != nil {
+				return fmt.Errorf("inject permissions for %q: %w", adapter.Agent(), err)
 			}
 		}
 		return nil
 	case model.ComponentSDD:
-		for _, agent := range s.agents {
-			if _, err := sdd.Inject(s.homeDir, agent); err != nil {
-				return fmt.Errorf("inject sdd for %q: %w", agent, err)
+		for _, adapter := range adapters {
+			if _, err := sdd.Inject(s.homeDir, adapter); err != nil {
+				return fmt.Errorf("inject sdd for %q: %w", adapter.Agent(), err)
 			}
 		}
 		return nil
@@ -311,9 +336,9 @@ func (s componentApplyStep) Run() error {
 		if len(skillIDs) == 0 {
 			return nil
 		}
-		for _, agent := range s.agents {
-			if _, err := skills.Inject(s.homeDir, agent, skillIDs); err != nil {
-				return fmt.Errorf("inject skills for %q: %w", agent, err)
+		for _, adapter := range adapters {
+			if _, err := skills.Inject(s.homeDir, adapter, skillIDs); err != nil {
+				return fmt.Errorf("inject skills for %q: %w", adapter.Agent(), err)
 			}
 		}
 		return nil
@@ -325,14 +350,14 @@ func (s componentApplyStep) Run() error {
 		if err := runCommandSequence(commands); err != nil {
 			return err
 		}
-		if _, err := gga.WriteDefaultConfig(s.homeDir); err != nil {
-			return fmt.Errorf("write gga config: %w", err)
+		if _, err := gga.Inject(s.homeDir, s.agents); err != nil {
+			return fmt.Errorf("inject gga config: %w", err)
 		}
 		return nil
 	case model.ComponentTheme:
-		for _, agent := range s.agents {
-			if _, err := theme.Inject(s.homeDir, agent); err != nil {
-				return fmt.Errorf("inject theme for %q: %w", agent, err)
+		for _, adapter := range adapters {
+			if _, err := theme.Inject(s.homeDir, adapter); err != nil {
+				return fmt.Errorf("inject theme for %q: %w", adapter.Agent(), err)
 			}
 		}
 		return nil
@@ -408,9 +433,10 @@ func selectedSkillIDs(selection model.Selection) []model.SkillID {
 
 func backupTargets(homeDir string, selection model.Selection, resolved planner.ResolvedPlan) []string {
 	paths := map[string]struct{}{}
+	adapters := resolveAdapters(resolved.Agents)
 
 	for _, component := range resolved.OrderedComponents {
-		for _, path := range componentPaths(homeDir, selection, resolved.Agents, component) {
+		for _, path := range componentPaths(homeDir, selection, adapters, component) {
 			paths[path] = struct{}{}
 		}
 	}
@@ -423,75 +449,80 @@ func backupTargets(homeDir string, selection model.Selection, resolved planner.R
 	return targets
 }
 
-func componentPaths(homeDir string, selection model.Selection, agents []model.AgentID, component model.ComponentID) []string {
+func componentPaths(homeDir string, selection model.Selection, adapters []agents.Adapter, component model.ComponentID) []string {
 	paths := []string{}
-	for _, agent := range agents {
+	for _, adapter := range adapters {
 		switch component {
 		case model.ComponentEngram:
-			if agent == model.AgentClaudeCode {
-				paths = append(paths,
-					filepath.Join(homeDir, ".claude", "mcp", "engram.json"),
-					filepath.Join(homeDir, ".claude", "CLAUDE.md"),
-				)
+			switch adapter.MCPStrategy() {
+			case model.StrategySeparateMCPFiles:
+				paths = append(paths, adapter.MCPConfigPath(homeDir, "engram"))
+			case model.StrategyMergeIntoSettings:
+				if p := adapter.SettingsPath(homeDir); p != "" {
+					paths = append(paths, p)
+				}
+			case model.StrategyMCPConfigFile:
+				if p := adapter.MCPConfigPath(homeDir, "engram"); p != "" {
+					paths = append(paths, p)
+				}
 			}
-			if agent == model.AgentOpenCode {
-				paths = append(paths, filepath.Join(homeDir, ".config", "opencode", "settings.json"))
+			if adapter.SystemPromptStrategy() == model.StrategyMarkdownSections {
+				paths = append(paths, adapter.SystemPromptFile(homeDir))
 			}
 		case model.ComponentSDD:
-			if agent == model.AgentClaudeCode {
-				paths = append(paths, filepath.Join(homeDir, ".claude", "CLAUDE.md"))
+			if adapter.SystemPromptStrategy() == model.StrategyMarkdownSections {
+				paths = append(paths, adapter.SystemPromptFile(homeDir))
 			}
-			if agent == model.AgentOpenCode {
+			if adapter.SupportsSlashCommands() {
 				for _, command := range sdd.OpenCodeCommands() {
-					paths = append(paths, filepath.Join(homeDir, ".config", "opencode", "commands", command.Name+".md"))
+					paths = append(paths, filepath.Join(adapter.CommandsDir(homeDir), command.Name+".md"))
 				}
 			}
 		case model.ComponentSkills:
 			for _, skillID := range selectedSkillIDs(selection) {
-				path, pathErr := skills.SkillPathForAgent(homeDir, agent, skillID)
-				if pathErr == nil {
+				path := skills.SkillPathForAgent(homeDir, adapter, skillID)
+				if path != "" {
 					paths = append(paths, path)
 				}
 			}
 		case model.ComponentContext7:
-			if agent == model.AgentClaudeCode {
-				paths = append(paths, filepath.Join(homeDir, ".claude", "mcp", "context7.json"))
-			}
-			if agent == model.AgentOpenCode {
-				paths = append(paths, filepath.Join(homeDir, ".config", "opencode", "settings.json"))
+			switch adapter.MCPStrategy() {
+			case model.StrategySeparateMCPFiles:
+				paths = append(paths, adapter.MCPConfigPath(homeDir, "context7"))
+			case model.StrategyMergeIntoSettings:
+				if p := adapter.SettingsPath(homeDir); p != "" {
+					paths = append(paths, p)
+				}
+			case model.StrategyMCPConfigFile:
+				if p := adapter.MCPConfigPath(homeDir, "context7"); p != "" {
+					paths = append(paths, p)
+				}
 			}
 		case model.ComponentPersona:
-			// Custom persona does nothing — no files to backup or verify.
 			if selection.Persona == model.PersonaCustom {
 				break
 			}
-			if agent == model.AgentClaudeCode {
-				paths = append(paths, filepath.Join(homeDir, ".claude", "CLAUDE.md"))
-				if selection.Persona == model.PersonaGentleman {
-					paths = append(paths,
-						filepath.Join(homeDir, ".claude", "output-styles", "gentleman.md"),
-						filepath.Join(homeDir, ".claude", "settings.json"),
-					)
+			if adapter.SupportsSystemPrompt() {
+				paths = append(paths, adapter.SystemPromptFile(homeDir))
+			}
+			if selection.Persona == model.PersonaGentleman {
+				if adapter.SupportsOutputStyles() {
+					paths = append(paths, adapter.OutputStyleDir(homeDir)+"/gentleman.md")
+					if p := adapter.SettingsPath(homeDir); p != "" {
+						paths = append(paths, p)
+					}
 				}
 			}
-			if agent == model.AgentOpenCode {
-				paths = append(paths, filepath.Join(homeDir, ".config", "opencode", "AGENTS.md"))
-			}
 		case model.ComponentPermission:
-			if agent == model.AgentClaudeCode {
-				paths = append(paths, filepath.Join(homeDir, ".claude", "settings.json"))
-			}
-			if agent == model.AgentOpenCode {
-				paths = append(paths, filepath.Join(homeDir, ".config", "opencode", "settings.json"))
+			if p := adapter.SettingsPath(homeDir); p != "" {
+				paths = append(paths, p)
 			}
 		case model.ComponentGGA:
-			paths = append(paths, filepath.Join(homeDir, ".config", "gga", "config.json"))
+			paths = append(paths, gga.ConfigPath(homeDir))
+			paths = append(paths, gga.AgentsTemplatePath(homeDir))
 		case model.ComponentTheme:
-			if agent == model.AgentClaudeCode {
-				paths = append(paths, filepath.Join(homeDir, ".claude", "settings.json"))
-			}
-			if agent == model.AgentOpenCode {
-				paths = append(paths, filepath.Join(homeDir, ".config", "opencode", "settings.json"))
+			if p := adapter.SettingsPath(homeDir); p != "" {
+				paths = append(paths, p)
 			}
 		}
 	}
@@ -501,9 +532,10 @@ func componentPaths(homeDir string, selection model.Selection, agents []model.Ag
 
 func runPostApplyVerification(homeDir string, selection model.Selection, resolved planner.ResolvedPlan) verify.Report {
 	checks := make([]verify.Check, 0)
+	adapters := resolveAdapters(resolved.Agents)
 
 	for _, component := range resolved.OrderedComponents {
-		for _, path := range componentPaths(homeDir, selection, resolved.Agents, component) {
+		for _, path := range componentPaths(homeDir, selection, adapters, component) {
 			currentPath := path
 			checks = append(checks, verify.Check{
 				ID:          "verify:file:" + currentPath,
@@ -518,7 +550,73 @@ func runPostApplyVerification(homeDir string, selection model.Selection, resolve
 		}
 	}
 
+	if hasComponent(resolved.OrderedComponents, model.ComponentEngram) {
+		checks = append(checks, engramHealthChecks()...)
+	}
+
 	return verify.BuildReport(verify.RunChecks(context.Background(), checks))
+}
+
+func hasComponent(components []model.ComponentID, target model.ComponentID) bool {
+	for _, c := range components {
+		if c == target {
+			return true
+		}
+	}
+	return false
+}
+
+func engramHealthChecks() []verify.Check {
+	return []verify.Check{
+		{
+			ID:          "verify:engram:binary",
+			Description: "engram binary on PATH (restart shell if missing)",
+			Soft:        true,
+			Run: func(context.Context) error {
+				return engram.VerifyInstalled()
+			},
+		},
+		{
+			ID:          "verify:engram:version",
+			Description: "engram version returns valid output",
+			Soft:        true,
+			Run: func(context.Context) error {
+				if err := engram.VerifyInstalled(); err != nil {
+					// Binary not on PATH — skip version check gracefully.
+					return nil
+				}
+				_, err := engram.VerifyVersion()
+				return err
+			},
+		},
+	}
+}
+
+// checkDependenciesStep verifies that required system dependencies are present.
+// It logs warnings for missing optional deps but only fails if required deps are missing.
+type checkDependenciesStep struct {
+	id      string
+	profile system.PlatformProfile
+}
+
+func (s checkDependenciesStep) ID() string {
+	return s.id
+}
+
+func (s checkDependenciesStep) Run() error {
+	report := system.DetectDependencies(context.Background(), s.profile)
+	if report.AllPresent {
+		return nil
+	}
+
+	// Print warnings for missing dependencies but do NOT block the pipeline.
+	// If a dep IS actually needed, the corresponding install step will fail
+	// (e.g., npm install will fail if node is missing). That is the right
+	// place for the error — not here.
+	fmt.Fprintf(os.Stderr, "WARNING: %s\n\n%s\n",
+		fmt.Sprintf("missing dependencies: %s", strings.Join(report.MissingRequired, ", ")),
+		system.FormatMissingDepsMessage(report))
+	return nil
 }
 
 type noopStep struct {

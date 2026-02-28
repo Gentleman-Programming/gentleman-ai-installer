@@ -3,8 +3,8 @@ package mcp
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/internal/components/filemerge"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
 )
@@ -14,19 +14,26 @@ type InjectionResult struct {
 	Files   []string
 }
 
-func Inject(homeDir string, agent model.AgentID) (InjectionResult, error) {
-	switch agent {
-	case model.AgentClaudeCode:
-		return injectClaude(homeDir)
-	case model.AgentOpenCode:
-		return injectOpenCode(homeDir)
+func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
+	if !adapter.SupportsMCP() {
+		return InjectionResult{}, nil
+	}
+
+	switch adapter.MCPStrategy() {
+	case model.StrategySeparateMCPFiles:
+		return injectSeparateFile(homeDir, adapter)
+	case model.StrategyMergeIntoSettings:
+		return injectMergeIntoSettings(homeDir, adapter)
+	case model.StrategyMCPConfigFile:
+		return injectMCPConfigFile(homeDir, adapter)
 	default:
-		return InjectionResult{}, fmt.Errorf("mcp injector does not support agent %q", agent)
+		return InjectionResult{}, fmt.Errorf("mcp injector does not support MCP strategy %d for agent %q", adapter.MCPStrategy(), adapter.Agent())
 	}
 }
 
-func injectClaude(homeDir string) (InjectionResult, error) {
-	path := filepath.Join(homeDir, ".claude", "mcp", "context7.json")
+// injectSeparateFile writes a standalone JSON file per MCP server (Claude Code pattern).
+func injectSeparateFile(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
+	path := adapter.MCPConfigPath(homeDir, "context7")
 	writeResult, err := filemerge.WriteFileAtomic(path, DefaultContext7ServerJSON(), 0o644)
 	if err != nil {
 		return InjectionResult{}, err
@@ -35,14 +42,35 @@ func injectClaude(homeDir string) (InjectionResult, error) {
 	return InjectionResult{Changed: writeResult.Changed, Files: []string{path}}, nil
 }
 
-func injectOpenCode(homeDir string) (InjectionResult, error) {
-	settingsPath := filepath.Join(homeDir, ".config", "opencode", "settings.json")
+// injectMergeIntoSettings merges mcpServers into a settings.json file (OpenCode, Gemini pattern).
+func injectMergeIntoSettings(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
+	settingsPath := adapter.SettingsPath(homeDir)
+	if settingsPath == "" {
+		return InjectionResult{}, nil
+	}
+
 	settingsWrite, err := mergeJSONFile(settingsPath, DefaultContext7OverlayJSON())
 	if err != nil {
 		return InjectionResult{}, err
 	}
 
 	return InjectionResult{Changed: settingsWrite.Changed, Files: []string{settingsPath}}, nil
+}
+
+// injectMCPConfigFile writes to a dedicated mcp.json config file (Cursor pattern).
+func injectMCPConfigFile(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
+	path := adapter.MCPConfigPath(homeDir, "context7")
+	if path == "" {
+		return InjectionResult{}, nil
+	}
+
+	// For mcp.json pattern, merge the server config as a named entry.
+	settingsWrite, err := mergeJSONFile(path, DefaultContext7OverlayJSON())
+	if err != nil {
+		return InjectionResult{}, err
+	}
+
+	return InjectionResult{Changed: settingsWrite.Changed, Files: []string{path}}, nil
 }
 
 func mergeJSONFile(path string, overlay []byte) (filemerge.WriteResult, error) {

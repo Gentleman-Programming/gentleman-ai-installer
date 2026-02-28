@@ -12,6 +12,7 @@ type Report struct {
 	Passed    int
 	Failed    int
 	Skipped   int
+	Warnings  int
 	Ready     bool
 	FinalNote string
 }
@@ -26,6 +27,8 @@ func BuildReport(results []CheckResult) Report {
 			report.Failed++
 		case CheckStatusSkipped:
 			report.Skipped++
+		case CheckStatusWarning:
+			report.Warnings++
 		}
 	}
 
@@ -41,7 +44,7 @@ func BuildReport(results []CheckResult) Report {
 
 func RenderReport(report Report) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Verification checks: %d passed, %d failed, %d skipped\n", report.Passed, report.Failed, report.Skipped)
+	fmt.Fprintf(&b, "Verification checks: %d passed, %d failed, %d warnings, %d skipped\n", report.Passed, report.Failed, report.Warnings, report.Skipped)
 
 	for _, check := range report.Checks {
 		line := "[ ]"
@@ -50,6 +53,8 @@ func RenderReport(report Report) string {
 			line = "[ok]"
 		case CheckStatusFailed:
 			line = "[!!]"
+		case CheckStatusWarning:
+			line = "[??]"
 		case CheckStatusSkipped:
 			line = "[--]"
 		}

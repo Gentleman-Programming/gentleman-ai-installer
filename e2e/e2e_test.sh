@@ -1172,17 +1172,19 @@ test_edge_multiple_json_overlays() {
 # --- Category: GGA tests ---
 
 test_gga_config() {
-    log_test "GGA component writes config.json"
+    log_test "GGA component writes config file"
     cleanup_test_env
 
     # GGA binary install may fail in Docker (go install needs time/network),
     # but we test the output regardless.
     if $BINARY install --agent claude-code --component gga --persona neutral 2>&1; then
-        local config="$HOME/.config/gga/config.json"
-        assert_file_exists "$config" "GGA config.json"
-        assert_file_contains "$config" '"enabled"' "Has enabled key"
-        assert_file_contains "$config" '"providers"' "Has providers key"
-        assert_valid_json "$config" "config.json is valid JSON"
+        local config="$HOME/.config/gga/config"
+        assert_file_exists "$config" "GGA config"
+        assert_file_contains "$config" 'PROVIDER=' "Has provider key"
+        assert_file_contains "$config" 'FILE_PATTERNS=' "Has file patterns key"
+
+        local agents_md="$HOME/.config/gga/AGENTS.md"
+        assert_file_exists "$agents_md" "GGA AGENTS.md template"
     else
         log_skip "GGA install failed (expected — binary install may require network)"
     fi

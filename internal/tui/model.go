@@ -446,8 +446,9 @@ func (m Model) restoreBackup(manifest backup.Manifest) (tea.Model, tea.Cmd) {
 // buildProgressLabels creates step labels from the resolved plan that match
 // the step IDs the pipeline will produce.
 func buildProgressLabels(resolved planner.ResolvedPlan) []string {
-	labels := make([]string, 0, 1+len(resolved.Agents)+len(resolved.OrderedComponents)+1)
+	labels := make([]string, 0, 2+len(resolved.Agents)+len(resolved.OrderedComponents)+1)
 
+	labels = append(labels, "prepare:check-dependencies")
 	labels = append(labels, "prepare:backup-snapshot")
 	labels = append(labels, "apply:rollback-restore")
 

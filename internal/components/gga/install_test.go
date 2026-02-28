@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gentleman-programming/gentle-ai/internal/model"
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
 
@@ -58,16 +57,6 @@ func TestInstallCommandByProfile(t *testing.T) {
 				t.Fatalf("InstallCommand() = %v, want %v", command, tt.want)
 			}
 		})
-	}
-}
-
-func TestValidateAgents(t *testing.T) {
-	if err := ValidateAgents([]model.AgentID{model.AgentClaudeCode, model.AgentOpenCode}); err != nil {
-		t.Fatalf("ValidateAgents() error = %v", err)
-	}
-
-	if err := ValidateAgents([]model.AgentID{model.AgentID("cursor")}); err == nil {
-		t.Fatalf("ValidateAgents() expected error for unsupported agent")
 	}
 }
 

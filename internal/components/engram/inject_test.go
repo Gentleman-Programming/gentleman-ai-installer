@@ -6,13 +6,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gentleman-programming/gentle-ai/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
 )
+
+func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
+func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
 
 func TestInjectClaudeWritesMCPConfig(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentClaudeCode)
+	result, err := Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -39,7 +44,7 @@ func TestInjectClaudeWritesMCPConfig(t *testing.T) {
 func TestInjectClaudeWritesProtocolSection(t *testing.T) {
 	home := t.TempDir()
 
-	_, err := Inject(home, model.AgentClaudeCode)
+	_, err := Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -66,7 +71,7 @@ func TestInjectClaudeWritesProtocolSection(t *testing.T) {
 func TestInjectClaudeIsIdempotent(t *testing.T) {
 	home := t.TempDir()
 
-	first, err := Inject(home, model.AgentClaudeCode)
+	first, err := Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() first error = %v", err)
 	}
@@ -74,7 +79,7 @@ func TestInjectClaudeIsIdempotent(t *testing.T) {
 		t.Fatalf("Inject() first changed = false")
 	}
 
-	second, err := Inject(home, model.AgentClaudeCode)
+	second, err := Inject(home, claudeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() second error = %v", err)
 	}
@@ -86,7 +91,7 @@ func TestInjectClaudeIsIdempotent(t *testing.T) {
 func TestInjectOpenCodeMergesEngramToSettings(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentOpenCode)
+	result, err := Inject(home, opencodeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -126,7 +131,7 @@ func TestInjectOpenCodeMergesEngramToSettings(t *testing.T) {
 func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 	home := t.TempDir()
 
-	first, err := Inject(home, model.AgentOpenCode)
+	first, err := Inject(home, opencodeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() first error = %v", err)
 	}
@@ -134,7 +139,7 @@ func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 		t.Fatalf("Inject() first changed = false")
 	}
 
-	second, err := Inject(home, model.AgentOpenCode)
+	second, err := Inject(home, opencodeAdapter())
 	if err != nil {
 		t.Fatalf("Inject() second error = %v", err)
 	}
@@ -143,11 +148,21 @@ func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestInjectUnsupportedAgentReturnsError(t *testing.T) {
+func TestInjectCursorMergesEngramToSettings(t *testing.T) {
 	home := t.TempDir()
 
-	_, err := Inject(home, model.AgentID("cursor"))
-	if err == nil {
-		t.Fatal("expected error for unsupported agent")
+	cursorAdapter, err := agents.NewAdapter("cursor")
+	if err != nil {
+		t.Fatalf("NewAdapter(cursor) error = %v", err)
+	}
+
+	result, injectErr := Inject(home, cursorAdapter)
+	if injectErr != nil {
+		t.Fatalf("Inject(cursor) error = %v", injectErr)
+	}
+
+	// Cursor uses MCPConfigFile strategy — engram gets merged into mcp.json.
+	if !result.Changed {
+		t.Fatalf("Inject(cursor) changed = false")
 	}
 }

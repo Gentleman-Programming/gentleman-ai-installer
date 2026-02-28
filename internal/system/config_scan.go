@@ -16,6 +16,8 @@ func ScanConfigs(homeDir string) []ConfigState {
 	paths := []ConfigState{
 		{Agent: "claude-code", Path: filepath.Join(homeDir, ".claude")},
 		{Agent: "opencode", Path: filepath.Join(homeDir, ".config", "opencode")},
+		{Agent: "gemini-cli", Path: filepath.Join(homeDir, ".gemini")},
+		{Agent: "cursor", Path: filepath.Join(homeDir, ".cursor")},
 	}
 
 	for idx := range paths {

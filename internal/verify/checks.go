@@ -8,12 +8,15 @@ const (
 	CheckStatusPassed  CheckStatus = "passed"
 	CheckStatusFailed  CheckStatus = "failed"
 	CheckStatusSkipped CheckStatus = "skipped"
+	CheckStatusWarning CheckStatus = "warning"
 )
 
 type Check struct {
 	ID          string
 	Description string
 	Run         func(context.Context) error
+	// Soft marks this check as non-blocking: errors produce a warning instead of a failure.
+	Soft bool
 }
 
 type CheckResult struct {
@@ -35,7 +38,11 @@ func RunChecks(ctx context.Context, checks []Check) []CheckResult {
 		}
 
 		if err := check.Run(ctx); err != nil {
-			result.Status = CheckStatusFailed
+			if check.Soft {
+				result.Status = CheckStatusWarning
+			} else {
+				result.Status = CheckStatusFailed
+			}
 			result.Error = err.Error()
 			results = append(results, result)
 			continue

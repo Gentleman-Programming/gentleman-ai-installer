@@ -3,16 +3,21 @@ package skills
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
 )
+
+func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
+func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
 
 func TestInjectWritesSkillFilesForOpenCode(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentOpenCode, []model.SkillID{model.SkillTypeScript})
+	result, err := Inject(home, opencodeAdapter(), []model.SkillID{model.SkillTypeScript})
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -38,7 +43,7 @@ func TestInjectWritesSkillFilesForOpenCode(t *testing.T) {
 	}
 
 	// Idempotent: second inject should not change.
-	second, err := Inject(home, model.AgentOpenCode, []model.SkillID{model.SkillTypeScript})
+	second, err := Inject(home, opencodeAdapter(), []model.SkillID{model.SkillTypeScript})
 	if err != nil {
 		t.Fatalf("Inject() second error = %v", err)
 	}
@@ -51,7 +56,7 @@ func TestInjectWritesSkillFilesForOpenCode(t *testing.T) {
 func TestInjectWritesSkillFilesForClaude(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentClaudeCode, []model.SkillID{model.SkillReact19, model.SkillSDDInit})
+	result, err := Inject(home, claudeAdapter(), []model.SkillID{model.SkillReact19, model.SkillSDDInit})
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -74,7 +79,7 @@ func TestInjectWritesSkillFilesForClaude(t *testing.T) {
 func TestInjectSkipsUnknownSkillGracefully(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentOpenCode, []model.SkillID{
+	result, err := Inject(home, opencodeAdapter(), []model.SkillID{
 		model.SkillTypeScript,
 		model.SkillID("nonexistent-skill"),
 	})
@@ -95,23 +100,33 @@ func TestInjectSkipsUnknownSkillGracefully(t *testing.T) {
 	}
 }
 
-func TestInjectRejectsUnsupportedAgent(t *testing.T) {
+func TestInjectSkipsUnsupportedAgent(t *testing.T) {
 	home := t.TempDir()
 
-	_, err := Inject(home, model.AgentID("cursor"), []model.SkillID{model.SkillTypeScript})
-	if err == nil {
-		t.Fatalf("Inject() expected error for unsupported agent")
+	// VS Code Copilot does not support skills — Inject should skip gracefully.
+	vscodeAdapter, err := agents.NewAdapter("vscode-copilot")
+	if err != nil {
+		t.Fatalf("NewAdapter(vscode-copilot) error = %v", err)
 	}
 
-	if !strings.Contains(err.Error(), "does not support agent") {
-		t.Fatalf("Inject() error = %v", err)
+	result, injectErr := Inject(home, vscodeAdapter, []model.SkillID{model.SkillTypeScript})
+	if injectErr != nil {
+		t.Fatalf("Inject() unexpected error = %v", injectErr)
+	}
+
+	// All skills should be skipped.
+	if len(result.Skipped) != 1 {
+		t.Fatalf("Inject() skipped = %v, want 1 skill", result.Skipped)
+	}
+	if result.Changed {
+		t.Fatal("Inject() changed = true, want false for unsupported agent")
 	}
 }
 
 func TestInjectUsesRealEmbeddedContent(t *testing.T) {
 	home := t.TempDir()
 
-	_, err := Inject(home, model.AgentClaudeCode, []model.SkillID{model.SkillTypeScript})
+	_, err := Inject(home, claudeAdapter(), []model.SkillID{model.SkillTypeScript})
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -129,19 +144,13 @@ func TestInjectUsesRealEmbeddedContent(t *testing.T) {
 }
 
 func TestSkillPathForAgent(t *testing.T) {
-	path, err := SkillPathForAgent("/home/test", model.AgentClaudeCode, model.SkillTypeScript)
-	if err != nil {
-		t.Fatalf("SkillPathForAgent() error = %v", err)
-	}
+	path := SkillPathForAgent("/home/test", claudeAdapter(), model.SkillTypeScript)
 	want := "/home/test/.claude/skills/typescript/SKILL.md"
 	if path != want {
 		t.Fatalf("SkillPathForAgent() = %q, want %q", path, want)
 	}
 
-	path, err = SkillPathForAgent("/home/test", model.AgentOpenCode, model.SkillReact19)
-	if err != nil {
-		t.Fatalf("SkillPathForAgent() error = %v", err)
-	}
+	path = SkillPathForAgent("/home/test", opencodeAdapter(), model.SkillReact19)
 	want = "/home/test/.config/opencode/skill/react-19/SKILL.md"
 	if path != want {
 		t.Fatalf("SkillPathForAgent() = %q, want %q", path, want)

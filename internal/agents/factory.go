@@ -4,7 +4,10 @@ import (
 	"fmt"
 
 	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
+	cursoradapter "github.com/gentleman-programming/gentle-ai/internal/agents/cursor"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/gemini"
 	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/vscode"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
 )
 
@@ -14,11 +17,44 @@ func NewAdapter(agent model.AgentID) (Adapter, error) {
 		return claude.NewAdapter(), nil
 	case model.AgentOpenCode:
 		return opencode.NewAdapter(), nil
+	case model.AgentGeminiCLI:
+		return gemini.NewAdapter(), nil
+	case model.AgentCursor:
+		return cursoradapter.NewAdapter(), nil
+	case model.AgentVSCodeCopilot:
+		return vscode.NewAdapter(), nil
 	default:
 		return nil, AgentNotSupportedError{Agent: agent}
 	}
 }
 
+func NewDefaultRegistry() (*Registry, error) {
+	adapters := make([]Adapter, 0, 5)
+
+	for _, agent := range []model.AgentID{
+		model.AgentClaudeCode,
+		model.AgentOpenCode,
+		model.AgentGeminiCLI,
+		model.AgentCursor,
+		model.AgentVSCodeCopilot,
+	} {
+		adapter, err := NewAdapter(agent)
+		if err != nil {
+			return nil, fmt.Errorf("create %s adapter: %w", agent, err)
+		}
+		adapters = append(adapters, adapter)
+	}
+
+	registry, err := NewRegistry(adapters...)
+	if err != nil {
+		return nil, fmt.Errorf("create registry: %w", err)
+	}
+
+	return registry, nil
+}
+
+// NewMVPRegistry creates a registry with only the MVP agents (Claude Code, OpenCode).
+// Kept for backward compatibility.
 func NewMVPRegistry() (*Registry, error) {
 	claudeAdapter, err := NewAdapter(model.AgentClaudeCode)
 	if err != nil {

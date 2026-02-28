@@ -7,13 +7,19 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
 )
+
+func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
+func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
 
 func TestInjectClaudeGentlemanWritesSectionWithRealContent(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentClaudeCode, model.PersonaGentleman)
+	result, err := Inject(home, claudeAdapter(), model.PersonaGentleman)
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -43,7 +49,7 @@ func TestInjectClaudeGentlemanWritesSectionWithRealContent(t *testing.T) {
 func TestInjectClaudeGentlemanWritesOutputStyleFile(t *testing.T) {
 	home := t.TempDir()
 
-	_, err := Inject(home, model.AgentClaudeCode, model.PersonaGentleman)
+	_, err := Inject(home, claudeAdapter(), model.PersonaGentleman)
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -80,7 +86,7 @@ func TestInjectClaudeGentlemanMergesOutputStyleIntoSettings(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	_, err := Inject(home, model.AgentClaudeCode, model.PersonaGentleman)
+	_, err := Inject(home, claudeAdapter(), model.PersonaGentleman)
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -117,7 +123,7 @@ func TestInjectClaudeGentlemanMergesOutputStyleIntoSettings(t *testing.T) {
 func TestInjectClaudeGentlemanReturnsAllFiles(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentClaudeCode, model.PersonaGentleman)
+	result, err := Inject(home, claudeAdapter(), model.PersonaGentleman)
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -145,7 +151,7 @@ func TestInjectClaudeGentlemanReturnsAllFiles(t *testing.T) {
 func TestInjectClaudeNeutralWritesMinimalContent(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentClaudeCode, model.PersonaNeutral)
+	result, err := Inject(home, claudeAdapter(), model.PersonaNeutral)
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -172,7 +178,7 @@ func TestInjectClaudeNeutralWritesMinimalContent(t *testing.T) {
 func TestInjectClaudeNeutralDoesNotWriteOutputStyle(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentClaudeCode, model.PersonaNeutral)
+	result, err := Inject(home, claudeAdapter(), model.PersonaNeutral)
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -192,7 +198,7 @@ func TestInjectClaudeNeutralDoesNotWriteOutputStyle(t *testing.T) {
 func TestInjectCustomClaudeDoesNothing(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentClaudeCode, model.PersonaCustom)
+	result, err := Inject(home, claudeAdapter(), model.PersonaCustom)
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -213,7 +219,7 @@ func TestInjectCustomClaudeDoesNothing(t *testing.T) {
 func TestInjectCustomOpenCodeDoesNothing(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentOpenCode, model.PersonaCustom)
+	result, err := Inject(home, opencodeAdapter(), model.PersonaCustom)
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -234,7 +240,7 @@ func TestInjectCustomOpenCodeDoesNothing(t *testing.T) {
 func TestInjectOpenCodeGentlemanWritesAgentsFile(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, model.AgentOpenCode, model.PersonaGentleman)
+	result, err := Inject(home, opencodeAdapter(), model.PersonaGentleman)
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -257,7 +263,7 @@ func TestInjectOpenCodeGentlemanWritesAgentsFile(t *testing.T) {
 func TestInjectClaudeIsIdempotent(t *testing.T) {
 	home := t.TempDir()
 
-	first, err := Inject(home, model.AgentClaudeCode, model.PersonaGentleman)
+	first, err := Inject(home, claudeAdapter(), model.PersonaGentleman)
 	if err != nil {
 		t.Fatalf("Inject() first error = %v", err)
 	}
@@ -265,7 +271,7 @@ func TestInjectClaudeIsIdempotent(t *testing.T) {
 		t.Fatalf("Inject() first changed = false")
 	}
 
-	second, err := Inject(home, model.AgentClaudeCode, model.PersonaGentleman)
+	second, err := Inject(home, claudeAdapter(), model.PersonaGentleman)
 	if err != nil {
 		t.Fatalf("Inject() second error = %v", err)
 	}
@@ -277,7 +283,7 @@ func TestInjectClaudeIsIdempotent(t *testing.T) {
 func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 	home := t.TempDir()
 
-	first, err := Inject(home, model.AgentOpenCode, model.PersonaGentleman)
+	first, err := Inject(home, opencodeAdapter(), model.PersonaGentleman)
 	if err != nil {
 		t.Fatalf("Inject() first error = %v", err)
 	}
@@ -285,7 +291,7 @@ func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 		t.Fatalf("Inject() first changed = false")
 	}
 
-	second, err := Inject(home, model.AgentOpenCode, model.PersonaGentleman)
+	second, err := Inject(home, opencodeAdapter(), model.PersonaGentleman)
 	if err != nil {
 		t.Fatalf("Inject() second error = %v", err)
 	}
@@ -294,11 +300,21 @@ func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestInjectUnsupportedAgentReturnsError(t *testing.T) {
+func TestInjectCursorGentlemanWritesRulesFile(t *testing.T) {
 	home := t.TempDir()
 
-	_, err := Inject(home, model.AgentID("cursor"), model.PersonaGentleman)
-	if err == nil {
-		t.Fatal("expected error for unsupported agent")
+	cursorAdapter, err := agents.NewAdapter("cursor")
+	if err != nil {
+		t.Fatalf("NewAdapter(cursor) error = %v", err)
+	}
+
+	result, injectErr := Inject(home, cursorAdapter, model.PersonaGentleman)
+	if injectErr != nil {
+		t.Fatalf("Inject(cursor) error = %v", injectErr)
+	}
+
+	// Cursor uses FileReplace strategy — should write a system prompt file.
+	if !result.Changed {
+		t.Fatalf("Inject(cursor, gentleman) changed = false")
 	}
 }

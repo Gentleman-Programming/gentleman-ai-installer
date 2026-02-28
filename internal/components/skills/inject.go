@@ -1,10 +1,10 @@
 package skills
 
 import (
-	"fmt"
 	"log"
 	"path/filepath"
 
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/internal/assets"
 	"github.com/gentleman-programming/gentle-ai/internal/components/filemerge"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
@@ -17,17 +17,21 @@ type InjectionResult struct {
 }
 
 // Inject writes the embedded SKILL.md files for each requested skill
-// to the correct directory for the given agent.
+// to the correct directory for the given agent adapter.
 //
-//   - Claude Code: ~/.claude/skills/{skillID}/SKILL.md
-//   - OpenCode:    ~/.config/opencode/skill/{skillID}/SKILL.md
+// The skills directory is determined by adapter.SkillsDir(), removing
+// the need for any agent-specific switch statements.
 //
 // Individual skill failures (e.g., missing embedded asset) are logged
 // and skipped rather than aborting the entire operation.
-func Inject(homeDir string, agent model.AgentID, skillIDs []model.SkillID) (InjectionResult, error) {
-	skillDir, err := skillDirectoryForAgent(homeDir, agent)
-	if err != nil {
-		return InjectionResult{}, err
+func Inject(homeDir string, adapter agents.Adapter, skillIDs []model.SkillID) (InjectionResult, error) {
+	if !adapter.SupportsSkills() {
+		return InjectionResult{Skipped: skillIDs}, nil
+	}
+
+	skillDir := adapter.SkillsDir(homeDir)
+	if skillDir == "" {
+		return InjectionResult{Skipped: skillIDs}, nil
 	}
 
 	paths := make([]string, 0, len(skillIDs))
@@ -59,21 +63,10 @@ func Inject(homeDir string, agent model.AgentID, skillIDs []model.SkillID) (Inje
 }
 
 // SkillPathForAgent returns the filesystem path where a skill file would be written.
-func SkillPathForAgent(homeDir string, agent model.AgentID, id model.SkillID) (string, error) {
-	skillDir, err := skillDirectoryForAgent(homeDir, agent)
-	if err != nil {
-		return "", err
+func SkillPathForAgent(homeDir string, adapter agents.Adapter, id model.SkillID) string {
+	skillDir := adapter.SkillsDir(homeDir)
+	if skillDir == "" {
+		return ""
 	}
-	return filepath.Join(skillDir, string(id), "SKILL.md"), nil
-}
-
-func skillDirectoryForAgent(homeDir string, agent model.AgentID) (string, error) {
-	switch agent {
-	case model.AgentClaudeCode:
-		return filepath.Join(homeDir, ".claude", "skills"), nil
-	case model.AgentOpenCode:
-		return filepath.Join(homeDir, ".config", "opencode", "skill"), nil
-	default:
-		return "", fmt.Errorf("skills injector does not support agent %q", agent)
-	}
+	return filepath.Join(skillDir, string(id), "SKILL.md")
 }
