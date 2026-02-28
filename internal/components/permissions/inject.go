@@ -6,6 +6,7 @@ import (
 
 	"github.com/gentleman-programming/gentle-ai/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/internal/components/filemerge"
+	"github.com/gentleman-programming/gentle-ai/internal/model"
 )
 
 type InjectionResult struct {
@@ -15,13 +16,21 @@ type InjectionResult struct {
 
 var permissionsOverlayJSON = []byte("{\n  \"permissions\": {\n    \"defaultMode\": \"ask\",\n    \"deny\": [\n      \"rm -rf /\",\n      \"sudo rm -rf /\",\n      \".env\"\n    ]\n  }\n}\n")
 
+// openCodePermissionsOverlayJSON uses the OpenCode "permission" key with bash/read granularity.
+var openCodePermissionsOverlayJSON = []byte("{\n  \"permission\": {\n    \"bash\": {\n      \"*\": \"allow\",\n      \"git commit *\": \"ask\",\n      \"git push *\": \"ask\",\n      \"git push\": \"ask\",\n      \"git push --force *\": \"ask\",\n      \"git rebase *\": \"ask\",\n      \"git reset --hard *\": \"ask\"\n    },\n    \"read\": {\n      \"*\": \"allow\",\n      \"*.env\": \"deny\",\n      \"*.env.*\": \"deny\",\n      \"**/.env\": \"deny\",\n      \"**/.env.*\": \"deny\",\n      \"**/secrets/**\": \"deny\",\n      \"**/credentials.json\": \"deny\"\n    }\n  }\n}\n")
+
 func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 	settingsPath := adapter.SettingsPath(homeDir)
 	if settingsPath == "" {
 		return InjectionResult{}, nil
 	}
 
-	writeResult, err := mergeJSONFile(settingsPath, permissionsOverlayJSON)
+	overlay := permissionsOverlayJSON
+	if adapter.Agent() == model.AgentOpenCode {
+		overlay = openCodePermissionsOverlayJSON
+	}
+
+	writeResult, err := mergeJSONFile(settingsPath, overlay)
 	if err != nil {
 		return InjectionResult{}, err
 	}

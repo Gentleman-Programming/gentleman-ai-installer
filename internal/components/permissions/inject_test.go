@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/internal/agents"
@@ -33,9 +34,28 @@ func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 		t.Fatalf("Inject() second changed = true")
 	}
 
-	path := filepath.Join(home, ".config", "opencode", "settings.json")
+	path := filepath.Join(home, ".config", "opencode", "opencode.json")
 	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("expected settings file %q: %v", path, err)
+		t.Fatalf("expected config file %q: %v", path, err)
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(opencode.json) error = %v", err)
+	}
+
+	text := string(content)
+	if !strings.Contains(text, `"permission"`) {
+		t.Fatal("opencode.json missing permission key")
+	}
+	if strings.Contains(text, `"permissions"`) {
+		t.Fatal("opencode.json should use 'permission' (singular), not 'permissions'")
+	}
+	if !strings.Contains(text, `"bash"`) {
+		t.Fatal("opencode.json permission missing bash section")
+	}
+	if !strings.Contains(text, `"read"`) {
+		t.Fatal("opencode.json permission missing read section")
 	}
 }
 

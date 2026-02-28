@@ -42,14 +42,19 @@ func injectSeparateFile(homeDir string, adapter agents.Adapter) (InjectionResult
 	return InjectionResult{Changed: writeResult.Changed, Files: []string{path}}, nil
 }
 
-// injectMergeIntoSettings merges mcpServers into a settings.json file (OpenCode, Gemini pattern).
+// injectMergeIntoSettings merges MCP servers into a config file (OpenCode opencode.json, Gemini settings.json).
 func injectMergeIntoSettings(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 	settingsPath := adapter.SettingsPath(homeDir)
 	if settingsPath == "" {
 		return InjectionResult{}, nil
 	}
 
-	settingsWrite, err := mergeJSONFile(settingsPath, DefaultContext7OverlayJSON())
+	overlay := DefaultContext7OverlayJSON()
+	if adapter.Agent() == model.AgentOpenCode {
+		overlay = OpenCodeContext7OverlayJSON()
+	}
+
+	settingsWrite, err := mergeJSONFile(settingsPath, overlay)
 	if err != nil {
 		return InjectionResult{}, err
 	}

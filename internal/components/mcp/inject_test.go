@@ -3,6 +3,7 @@ package mcp
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/internal/agents"
@@ -32,14 +33,25 @@ func TestInjectOpenCodeMergesContext7AndIsIdempotent(t *testing.T) {
 		t.Fatalf("Inject() second changed = true")
 	}
 
-	settingsPath := filepath.Join(home, ".config", "opencode", "settings.json")
-	settings, err := os.ReadFile(settingsPath)
+	configPath := filepath.Join(home, ".config", "opencode", "opencode.json")
+	config, err := os.ReadFile(configPath)
 	if err != nil {
-		t.Fatalf("ReadFile(settings.json) error = %v", err)
+		t.Fatalf("ReadFile(opencode.json) error = %v", err)
 	}
 
-	if len(settings) == 0 {
-		t.Fatalf("settings.json is empty")
+	if len(config) == 0 {
+		t.Fatalf("opencode.json is empty")
+	}
+
+	text := string(config)
+	if !strings.Contains(text, `"mcp"`) {
+		t.Fatal("opencode.json missing mcp key")
+	}
+	if !strings.Contains(text, `"type": "remote"`) {
+		t.Fatal("opencode.json context7 missing type: remote")
+	}
+	if strings.Contains(text, `"mcpServers"`) {
+		t.Fatal("opencode.json should use 'mcp' key, not 'mcpServers'")
 	}
 }
 

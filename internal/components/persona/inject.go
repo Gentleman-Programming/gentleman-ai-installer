@@ -20,6 +20,11 @@ const neutralPersonaContent = "Be helpful, direct, and technically precise. Focu
 // outputStyleOverlayJSON is the settings.json overlay to enable the Gentleman output style.
 var outputStyleOverlayJSON = []byte("{\n  \"outputStyle\": \"Gentleman\"\n}\n")
 
+// openCodeAgentOverlayJSON defines Tab-switchable agents for OpenCode.
+// "gentleman" is the primary agent, "sdd-orchestrator" is available via Tab.
+// Both reference AGENTS.md via {file:./AGENTS.md} for their system prompt.
+var openCodeAgentOverlayJSON = []byte("{\n  \"agent\": {\n    \"gentleman\": {\n      \"mode\": \"primary\",\n      \"description\": \"Senior Architect mentor - helpful first, challenging when it matters\",\n      \"prompt\": \"{file:./AGENTS.md}\",\n      \"tools\": {\n        \"write\": true,\n        \"edit\": true\n      }\n    },\n    \"sdd-orchestrator\": {\n      \"mode\": \"all\",\n      \"description\": \"Gentleman personality + SDD delegate-only orchestrator\",\n      \"prompt\": \"{file:./AGENTS.md}\",\n      \"tools\": {\n        \"read\": true,\n        \"write\": true,\n        \"edit\": true,\n        \"bash\": true\n      }\n    }\n  }\n}\n")
+
 func Inject(homeDir string, adapter agents.Adapter, persona model.PersonaID) (InjectionResult, error) {
 	if !adapter.SupportsSystemPrompt() {
 		return InjectionResult{}, nil
@@ -75,7 +80,20 @@ func Inject(homeDir string, adapter agents.Adapter, persona model.PersonaID) (In
 		files = append(files, promptPath)
 	}
 
-	// 2. Gentleman-only: write output style + merge into settings (if agent supports it).
+	// 2. OpenCode agent definitions — Tab-switchable agents in opencode.json.
+	if adapter.Agent() == model.AgentOpenCode && persona != model.PersonaCustom {
+		settingsPath := adapter.SettingsPath(homeDir)
+		if settingsPath != "" {
+			agentResult, err := mergeJSONFile(settingsPath, openCodeAgentOverlayJSON)
+			if err != nil {
+				return InjectionResult{}, err
+			}
+			changed = changed || agentResult.Changed
+			files = append(files, settingsPath)
+		}
+	}
+
+	// 3. Gentleman-only: write output style + merge into settings (if agent supports it).
 	if persona == model.PersonaGentleman && adapter.SupportsOutputStyles() {
 		outputStyleDir := adapter.OutputStyleDir(homeDir)
 		if outputStyleDir != "" {

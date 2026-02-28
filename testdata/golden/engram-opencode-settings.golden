@@ -1,8 +1,12 @@
 {
-  "mcpServers": {
+  "mcp": {
     "engram": {
-      "args": [],
-      "command": "engram"
+      "command": [
+        "engram",
+        "mcp"
+      ],
+      "enabled": true,
+      "type": "local"
     }
   }
 }

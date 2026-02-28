@@ -99,23 +99,29 @@ func TestInjectOpenCodeMergesEngramToSettings(t *testing.T) {
 		t.Fatalf("Inject() changed = false")
 	}
 
-	// Should only have settings.json — no plugin files.
+	// Should only have opencode.json — no plugin files.
 	if len(result.Files) != 1 {
-		t.Fatalf("Inject() files = %v, want exactly 1 (settings.json)", result.Files)
+		t.Fatalf("Inject() files = %v, want exactly 1 (opencode.json)", result.Files)
 	}
 
-	settingsPath := filepath.Join(home, ".config", "opencode", "settings.json")
-	settings, err := os.ReadFile(settingsPath)
+	configPath := filepath.Join(home, ".config", "opencode", "opencode.json")
+	config, err := os.ReadFile(configPath)
 	if err != nil {
-		t.Fatalf("ReadFile(settings.json) error = %v", err)
+		t.Fatalf("ReadFile(opencode.json) error = %v", err)
 	}
 
-	text := string(settings)
+	text := string(config)
 	if !strings.Contains(text, `"engram"`) {
-		t.Fatal("settings.json missing engram server entry")
+		t.Fatal("opencode.json missing engram server entry")
 	}
-	if !strings.Contains(text, `"mcpServers"`) {
-		t.Fatal("settings.json missing mcpServers key")
+	if !strings.Contains(text, `"mcp"`) {
+		t.Fatal("opencode.json missing mcp key")
+	}
+	if strings.Contains(text, `"mcpServers"`) {
+		t.Fatal("opencode.json should use 'mcp' key, not 'mcpServers'")
+	}
+	if !strings.Contains(text, `"type": "local"`) {
+		t.Fatal("opencode.json engram missing type: local")
 	}
 
 	// Verify NO plugin files or plugin arrays exist.
@@ -124,7 +130,7 @@ func TestInjectOpenCodeMergesEngramToSettings(t *testing.T) {
 		t.Fatal("plugin file should NOT exist — old approach removed")
 	}
 	if strings.Contains(text, `"plugins"`) {
-		t.Fatal("settings.json should NOT contain plugins key")
+		t.Fatal("opencode.json should NOT contain plugins key")
 	}
 }
 

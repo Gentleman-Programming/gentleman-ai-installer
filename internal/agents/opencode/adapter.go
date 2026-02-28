@@ -89,7 +89,7 @@ func (a *Adapter) SkillsDir(homeDir string) string {
 }
 
 func (a *Adapter) SettingsPath(homeDir string) string {
-	return filepath.Join(homeDir, ".config", "opencode", "settings.json")
+	return filepath.Join(homeDir, ".config", "opencode", "opencode.json")
 }
 
 // --- Config strategies ---
@@ -105,9 +105,9 @@ func (a *Adapter) MCPStrategy() model.MCPStrategy {
 // --- MCP ---
 
 func (a *Adapter) MCPConfigPath(homeDir string, serverName string) string {
-	// OpenCode merges into settings.json, but this provides the path
+	// OpenCode merges into opencode.json, but this provides the path
 	// for components that use the separate-file strategy fallback.
-	return filepath.Join(homeDir, ".config", "opencode", "settings.json")
+	return filepath.Join(homeDir, ".config", "opencode", "opencode.json")
 }
 
 // --- Optional capabilities ---

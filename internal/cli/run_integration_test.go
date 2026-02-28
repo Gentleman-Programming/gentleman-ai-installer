@@ -32,15 +32,15 @@ func TestRunInstallAppliesFilesystemChanges(t *testing.T) {
 		t.Fatalf("verification ready = false, report = %#v", result.Verify)
 	}
 
-	settingsPath := filepath.Join(home, ".config", "opencode", "settings.json")
-	if _, err := os.Stat(settingsPath); err != nil {
-		t.Fatalf("expected settings file %q: %v", settingsPath, err)
+	configPath := filepath.Join(home, ".config", "opencode", "opencode.json")
+	if _, err := os.Stat(configPath); err != nil {
+		t.Fatalf("expected config file %q: %v", configPath, err)
 	}
 }
 
 func TestRunInstallRollsBackOnComponentFailure(t *testing.T) {
 	home := t.TempDir()
-	settingsPath := filepath.Join(home, ".config", "opencode", "settings.json")
+	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
@@ -275,7 +275,7 @@ func TestRunInstallLinuxArchWithEngramResolvesGoInstallCommand(t *testing.T) {
 
 func TestRunInstallLinuxRollsBackOnComponentFailure(t *testing.T) {
 	home := t.TempDir()
-	settingsPath := filepath.Join(home, ".config", "opencode", "settings.json")
+	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
@@ -556,7 +556,7 @@ func TestRunInstallMacOSVerificationMatchesPreLinuxBehavior(t *testing.T) {
 
 func TestRunInstallMacOSRollbackStillWorks(t *testing.T) {
 	home := t.TempDir()
-	settingsPath := filepath.Join(home, ".config", "opencode", "settings.json")
+	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}

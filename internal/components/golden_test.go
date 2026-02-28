@@ -257,8 +257,8 @@ func TestGoldenEngram_OpenCode(t *testing.T) {
 		t.Fatalf("engram.Inject(opencode) changed = false")
 	}
 
-	settingsJSON := readTestFile(t, filepath.Join(home, ".config", "opencode", "settings.json"))
-	assertGolden(t, "engram-opencode-settings.golden", settingsJSON)
+	configJSON := readTestFile(t, filepath.Join(home, ".config", "opencode", "opencode.json"))
+	assertGolden(t, "engram-opencode-settings.golden", configJSON)
 }
 
 // ---------------------------------------------------------------------------
