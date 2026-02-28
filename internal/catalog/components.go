@@ -1,6 +1,6 @@
 package catalog
 
-import "github.com/gentleman-programming/gentleman-ai-installer/internal/model"
+import "github.com/gentleman-programming/gentle-ai/internal/model"
 
 type Component struct {
 	ID          model.ComponentID

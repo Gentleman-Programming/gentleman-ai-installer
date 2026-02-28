@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/components/mcp"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/components/sdd"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/components/skills"
+	"github.com/gentleman-programming/gentle-ai/internal/components/mcp"
+	"github.com/gentleman-programming/gentle-ai/internal/components/sdd"
+	"github.com/gentleman-programming/gentle-ai/internal/components/skills"
 )
 
 func TestGoldenConfigs(t *testing.T) {

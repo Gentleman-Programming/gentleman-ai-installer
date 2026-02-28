@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/model"
 )
 
 func TestInjectOpenCodeMergesContext7AndIsIdempotent(t *testing.T) {

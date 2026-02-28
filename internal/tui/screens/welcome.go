@@ -3,7 +3,7 @@ package screens
 import (
 	"strings"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/tui/styles"
+	"github.com/gentleman-programming/gentle-ai/internal/tui/styles"
 )
 
 func WelcomeOptions() []string {

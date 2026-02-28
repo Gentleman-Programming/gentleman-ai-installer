@@ -1,6 +1,6 @@
 package planner
 
-import "github.com/gentleman-programming/gentleman-ai-installer/internal/model"
+import "github.com/gentleman-programming/gentle-ai/internal/model"
 
 type Graph struct {
 	dependencies map[model.ComponentID][]model.ComponentID

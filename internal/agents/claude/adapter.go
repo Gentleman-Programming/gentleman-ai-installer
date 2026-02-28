@@ -5,9 +5,9 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/installcmd"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/model"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/system"
+	"github.com/gentleman-programming/gentle-ai/internal/installcmd"
+	"github.com/gentleman-programming/gentle-ai/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
 
 type statResult struct {

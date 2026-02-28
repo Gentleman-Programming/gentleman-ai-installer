@@ -1,4 +1,4 @@
-module github.com/gentleman-programming/gentleman-ai-installer
+module github.com/gentleman-programming/gentle-ai
 
 go 1.22
 

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/model"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/planner"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/tui/styles"
+	"github.com/gentleman-programming/gentle-ai/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/planner"
+	"github.com/gentleman-programming/gentle-ai/internal/tui/styles"
 )
 
 func DependencyTreeOptions() []string {

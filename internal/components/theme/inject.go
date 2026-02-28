@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/components/filemerge"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/components/filemerge"
+	"github.com/gentleman-programming/gentle-ai/internal/model"
 )
 
 type InjectionResult struct {

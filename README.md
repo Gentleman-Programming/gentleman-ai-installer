@@ -25,7 +25,7 @@
 <p><strong>One command. Any agent. Any OS. The Gentleman AI ecosystem -- configured and ready.</strong></p>
 
 <p>
-<a href="https://github.com/Gentleman-Programming/gentleman-ai-installer/releases"><img src="https://img.shields.io/github/v/release/Gentleman-Programming/gentleman-ai-installer" alt="Release"></a>
+<a href="https://github.com/Gentleman-Programming/gentle-ai/releases"><img src="https://img.shields.io/github/v/release/Gentleman-Programming/gentle-ai" alt="Release"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
@@ -56,18 +56,18 @@ This is NOT an AI agent installer. Most agents are easy to install. This is an *
 
 ```bash
 brew tap Gentleman-Programming/homebrew-tap
-brew install gentleman-ai
+brew install gentle-ai
 ```
 
 ### Go install (any platform)
 
 ```bash
-go install github.com/gentleman-programming/gentleman-ai-installer/cmd/gentleman-ai@latest
+go install github.com/gentleman-programming/gentle-ai/cmd/gentle-ai@latest
 ```
 
 ### From releases
 
-Download the binary for your platform from [GitHub Releases](https://github.com/Gentleman-Programming/gentleman-ai-installer/releases).
+Download the binary for your platform from [GitHub Releases](https://github.com/Gentleman-Programming/gentle-ai/releases).
 
 ## Usage
 
@@ -76,19 +76,19 @@ Download the binary for your platform from [GitHub Releases](https://github.com/
 Just run it -- the interactive TUI guides you through everything:
 
 ```bash
-gentleman-ai
+gentle-ai
 ```
 
 ### CLI mode
 
 ```bash
 # Full ecosystem for both agents
-gentleman-ai install \
+gentle-ai install \
   --agent claude-code,opencode \
   --preset full-gentleman
 
 # Dry-run first (see what would happen)
-gentleman-ai install --dry-run \
+gentle-ai install --dry-run \
   --agent claude-code,opencode \
   --component engram,sdd,skills,context7,persona,permissions
 ```
@@ -137,7 +137,7 @@ Derivatives are detected via `ID_LIKE` in `/etc/os-release` (Linux Mint, Pop!_OS
 ## Architecture
 
 ```
-cmd/gentleman-ai/          CLI entrypoint
+cmd/gentle-ai/             CLI entrypoint
 internal/
   app/                     Command dispatch + runtime wiring
   system/                  OS/distro detection, platform profiles, support guards
@@ -167,7 +167,7 @@ go test ./...
 RUN_FULL_E2E=1 RUN_BACKUP_TESTS=1 ./e2e/docker-test.sh
 
 # Dry-run smoke test
-gentleman-ai install --dry-run
+gentle-ai install --dry-run
 ```
 
 ## Relationship to Gentleman.Dots

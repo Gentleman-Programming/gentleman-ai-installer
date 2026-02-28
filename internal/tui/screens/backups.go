@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/backup"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/tui/styles"
+	"github.com/gentleman-programming/gentle-ai/internal/backup"
+	"github.com/gentleman-programming/gentle-ai/internal/tui/styles"
 )
 
 func RenderBackups(backups []backup.Manifest, cursor int) string {

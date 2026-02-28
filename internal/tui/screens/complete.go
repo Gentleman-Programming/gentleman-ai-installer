@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/tui/styles"
+	"github.com/gentleman-programming/gentle-ai/internal/tui/styles"
 )
 
 func RenderComplete(configuredAgents int, installedComponents int) string {

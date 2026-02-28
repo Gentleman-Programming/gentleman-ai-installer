@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/model"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/system"
+	"github.com/gentleman-programming/gentle-ai/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
 
 func TestNavigationWelcomeToDetection(t *testing.T) {

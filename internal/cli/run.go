@@ -9,19 +9,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/agents"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/backup"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/components/engram"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/components/mcp"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/components/permissions"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/components/persona"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/components/sdd"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/components/skills"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/model"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/pipeline"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/planner"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/system"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/verify"
+	"github.com/gentleman-programming/gentle-ai/internal/agents"
+	"github.com/gentleman-programming/gentle-ai/internal/backup"
+	"github.com/gentleman-programming/gentle-ai/internal/components/engram"
+	"github.com/gentleman-programming/gentle-ai/internal/components/mcp"
+	"github.com/gentleman-programming/gentle-ai/internal/components/permissions"
+	"github.com/gentleman-programming/gentle-ai/internal/components/persona"
+	"github.com/gentleman-programming/gentle-ai/internal/components/sdd"
+	"github.com/gentleman-programming/gentle-ai/internal/components/skills"
+	"github.com/gentleman-programming/gentle-ai/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/pipeline"
+	"github.com/gentleman-programming/gentle-ai/internal/planner"
+	"github.com/gentleman-programming/gentle-ai/internal/system"
+	"github.com/gentleman-programming/gentle-ai/internal/verify"
 )
 
 type InstallResult struct {
@@ -132,7 +132,7 @@ type runtimeState struct {
 }
 
 func newInstallRuntime(homeDir string, selection model.Selection, resolved planner.ResolvedPlan, profile system.PlatformProfile) (*installRuntime, error) {
-	backupRoot := filepath.Join(homeDir, ".gentleman-ai-installer", "backups")
+	backupRoot := filepath.Join(homeDir, ".gentle-ai", "backups")
 	if err := os.MkdirAll(backupRoot, 0o755); err != nil {
 		return nil, fmt.Errorf("create backup root directory %q: %w", backupRoot, err)
 	}

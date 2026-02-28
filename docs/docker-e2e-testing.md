@@ -1,6 +1,6 @@
 # Docker E2E Testing
 
-End-to-end tests that validate the `gentleman-ai` installer binary inside Docker containers running real Linux distributions.
+End-to-end tests that validate the `gentle-ai` installer binary inside Docker containers running real Linux distributions.
 
 ## Architecture
 
@@ -53,15 +53,15 @@ RUN_FULL_E2E=1 RUN_BACKUP_TESTS=1 ./e2e/docker-test.sh
 
 ```bash
 # Build and run Ubuntu only
-docker build -f e2e/Dockerfile.ubuntu -t gentleman-ai-e2e-ubuntu .
-docker run --rm gentleman-ai-e2e-ubuntu
+docker build -f e2e/Dockerfile.ubuntu -t gentle-ai-e2e-ubuntu .
+docker run --rm gentle-ai-e2e-ubuntu
 
 # Run with full E2E on Arch
-docker build -f e2e/Dockerfile.arch -t gentleman-ai-e2e-arch .
-docker run --rm -e RUN_FULL_E2E=1 gentleman-ai-e2e-arch
+docker build -f e2e/Dockerfile.arch -t gentle-ai-e2e-arch .
+docker run --rm -e RUN_FULL_E2E=1 gentle-ai-e2e-arch
 
 # Interactive debugging
-docker run --rm -it gentleman-ai-e2e-ubuntu /bin/bash
+docker run --rm -it gentle-ai-e2e-ubuntu /bin/bash
 ```
 
 ## Adding a new platform
@@ -69,7 +69,7 @@ docker run --rm -it gentleman-ai-e2e-ubuntu /bin/bash
 1. Create `e2e/Dockerfile.<platform>` following the existing pattern
 2. Add the entry to `PLATFORMS` array in `docker-test.sh`
 3. Ensure the Dockerfile creates `testuser` with NOPASSWD sudo
-4. Build the `gentleman-ai` binary for `linux/amd64`
+4. Build the `gentle-ai` binary for `linux/amd64`
 
 ## Adding new test cases
 

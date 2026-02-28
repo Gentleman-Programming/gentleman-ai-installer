@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib.sh — shared test helpers for gentleman-ai E2E tests
+# lib.sh — shared test helpers for gentle-ai E2E tests
 # Sourced by e2e_test.sh; never executed directly.
 set -euo pipefail
 
@@ -31,16 +31,16 @@ log_info()  { printf "${BLUE}[INFO]${NC}  %s\n" "$1"; }
 # ---------------------------------------------------------------------------
 # Binary resolution
 # ---------------------------------------------------------------------------
-# The binary should be built and placed at /usr/local/bin/gentleman-ai inside
-# the Docker container. If not found, fall back to $HOME/gentleman-ai or the
+# The binary should be built and placed at /usr/local/bin/gentle-ai inside
+# the Docker container. If not found, fall back to $HOME/gentle-ai or the
 # current directory.
 resolve_binary() {
-    if command -v gentleman-ai >/dev/null 2>&1; then
-        echo "gentleman-ai"
-    elif [ -x "$HOME/gentleman-ai" ]; then
-        echo "$HOME/gentleman-ai"
-    elif [ -x "./gentleman-ai" ]; then
-        echo "./gentleman-ai"
+    if command -v gentle-ai >/dev/null 2>&1; then
+        echo "gentle-ai"
+    elif [ -x "$HOME/gentle-ai" ]; then
+        echo "$HOME/gentle-ai"
+    elif [ -x "./gentle-ai" ]; then
+        echo "./gentle-ai"
     else
         echo ""
     fi
@@ -55,7 +55,7 @@ resolve_binary() {
 cleanup_test_env() {
     rm -rf "$HOME/.config/opencode" 2>/dev/null || true
     rm -rf "$HOME/.claude" 2>/dev/null || true
-    rm -rf "$HOME/.gentleman-ai-installer" 2>/dev/null || true
+    rm -rf "$HOME/.gentle-ai" 2>/dev/null || true
     mkdir -p "$HOME/.config"
 }
 

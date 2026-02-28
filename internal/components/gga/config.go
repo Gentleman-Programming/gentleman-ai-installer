@@ -3,7 +3,7 @@ package gga
 import (
 	"path/filepath"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/components/filemerge"
+	"github.com/gentleman-programming/gentle-ai/internal/components/filemerge"
 )
 
 type ConfigResult struct {

@@ -27,7 +27,7 @@
 ## Run
 
 ```bash
-go run ./cmd/gentleman-ai install --dry-run
+go run ./cmd/gentle-ai install --dry-run
 ```
 
 Use `--dry-run` first to validate selections and execution plan without applying changes. The dry-run output includes a `Platform decision` line showing the detected OS, distro, package manager, and support status.
@@ -35,7 +35,7 @@ Use `--dry-run` first to validate selections and execution plan without applying
 ## First real install
 
 ```bash
-go run ./cmd/gentleman-ai install
+go run ./cmd/gentle-ai install
 ```
 
 The installer detects your platform automatically — no flags needed to select macOS vs Linux. Install commands are resolved through the appropriate package manager (brew, apt, or pacman) based on detection.

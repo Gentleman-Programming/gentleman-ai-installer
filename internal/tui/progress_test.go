@@ -3,7 +3,7 @@ package tui
 import (
 	"testing"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/pipeline"
+	"github.com/gentleman-programming/gentle-ai/internal/pipeline"
 )
 
 func TestProgressPercentTracksCompletedSteps(t *testing.T) {

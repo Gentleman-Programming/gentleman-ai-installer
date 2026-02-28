@@ -4,12 +4,12 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/backup"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/catalog"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/model"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/planner"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/system"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/tui/screens"
+	"github.com/gentleman-programming/gentle-ai/internal/backup"
+	"github.com/gentleman-programming/gentle-ai/internal/catalog"
+	"github.com/gentleman-programming/gentle-ai/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/planner"
+	"github.com/gentleman-programming/gentle-ai/internal/system"
+	"github.com/gentleman-programming/gentle-ai/internal/tui/screens"
 )
 
 type Screen int

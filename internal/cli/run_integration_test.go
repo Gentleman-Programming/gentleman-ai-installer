@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/system"
+	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
 
 func TestRunInstallAppliesFilesystemChanges(t *testing.T) {

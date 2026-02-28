@@ -7,10 +7,10 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/cli"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/system"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/tui"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/verify"
+	"github.com/gentleman-programming/gentle-ai/internal/cli"
+	"github.com/gentleman-programming/gentle-ai/internal/system"
+	"github.com/gentleman-programming/gentle-ai/internal/tui"
+	"github.com/gentleman-programming/gentle-ai/internal/verify"
 )
 
 // Version is set from main via ldflags at build time.
@@ -43,7 +43,7 @@ func RunArgs(args []string, stdout io.Writer) error {
 
 	switch args[0] {
 	case "version", "--version", "-v":
-		_, _ = fmt.Fprintf(stdout, "gentleman-ai %s\n", Version)
+		_, _ = fmt.Fprintf(stdout, "gentle-ai %s\n", Version)
 		return nil
 	case "install":
 		installResult, err := cli.RunInstall(args[1:], result)

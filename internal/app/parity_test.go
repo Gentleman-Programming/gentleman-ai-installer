@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/cli"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/planner"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/system"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/tui"
+	"github.com/gentleman-programming/gentle-ai/internal/cli"
+	"github.com/gentleman-programming/gentle-ai/internal/planner"
+	"github.com/gentleman-programming/gentle-ai/internal/system"
+	"github.com/gentleman-programming/gentle-ai/internal/tui"
 )
 
 func TestInstallDefaultsMatchTUIModelDefaults(t *testing.T) {

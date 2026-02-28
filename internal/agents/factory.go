@@ -3,9 +3,9 @@ package agents
 import (
 	"fmt"
 
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/agents/claude"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/agents/opencode"
-	"github.com/gentleman-programming/gentleman-ai-installer/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/claude"
+	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
+	"github.com/gentleman-programming/gentle-ai/internal/model"
 )
 
 func NewAdapter(agent model.AgentID) (Adapter, error) {

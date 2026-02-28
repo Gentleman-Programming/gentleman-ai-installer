@@ -1,4 +1,4 @@
-# Dockerfile.arch — E2E test image for gentleman-ai on Arch Linux
+# Dockerfile.arch — E2E test image for gentle-ai on Arch Linux
 # Builds the binary from source and runs the E2E test suite as a non-root user.
 # archlinux:base only provides x86_64 images. Force amd64 platform so Docker
 # uses QEMU emulation on ARM hosts (Apple Silicon).
@@ -34,7 +34,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -o /usr/local/bin/gentleman-ai ./cmd/gentleman-ai
+    go build -o /usr/local/bin/gentle-ai ./cmd/gentle-ai
 
 # ---------------------------------------------------------------------------
 # Prepare test environment
