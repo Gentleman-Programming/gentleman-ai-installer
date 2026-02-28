@@ -2,6 +2,7 @@ package tui
 
 import (
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gentleman-programming/gentle-ai/internal/backup"
@@ -11,6 +12,18 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 	"github.com/gentleman-programming/gentle-ai/internal/tui/screens"
 )
+
+// spinnerFrames are the braille characters used for the animated spinner.
+var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
+// TickMsg drives the spinner animation on the installing screen.
+type TickMsg time.Time
+
+func tickCmd() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+		return TickMsg(t)
+	})
+}
 
 type Screen int
 
@@ -35,6 +48,7 @@ type Model struct {
 	Height         int
 	Cursor         int
 	Version        string
+	SpinnerFrame   int
 
 	Selection      model.Selection
 	Detection      system.DetectionResult
@@ -76,6 +90,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Width = msg.Width
 		m.Height = msg.Height
 		return m, nil
+	case TickMsg:
+		if m.Screen == ScreenInstalling && !m.Progress.Done() {
+			m.SpinnerFrame = (m.SpinnerFrame + 1) % len(spinnerFrames)
+			return m, tickCmd()
+		}
+		return m, nil
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
 	}
@@ -96,11 +116,11 @@ func (m Model) View() string {
 	case ScreenPreset:
 		return screens.RenderPreset(m.Selection.Preset, m.Cursor)
 	case ScreenDependencyTree:
-		return screens.RenderDependencyTree(m.DependencyPlan, m.Cursor)
+		return screens.RenderDependencyTree(m.DependencyPlan, m.Selection, m.Cursor)
 	case ScreenReview:
 		return screens.RenderReview(m.Review, m.Cursor)
 	case ScreenInstalling:
-		return screens.RenderInstalling(m.Progress.ViewModel())
+		return screens.RenderInstalling(m.Progress.ViewModel(), spinnerFrames[m.SpinnerFrame])
 	case ScreenComplete:
 		return screens.RenderComplete(len(m.Selection.Agents), len(m.Selection.Components))
 	case ScreenBackups:
@@ -127,8 +147,13 @@ func (m Model) handleKeyPress(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		return m.goBack(), nil
 	case " ":
-		if m.Screen == ScreenAgents {
+		switch m.Screen {
+		case ScreenAgents:
 			m.toggleCurrentAgent()
+		case ScreenDependencyTree:
+			if m.Selection.Preset == model.PresetCustom {
+				m.toggleCurrentComponent()
+			}
 		}
 		return m, nil
 	case "enter":
@@ -184,6 +209,20 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 		}
 		m.setScreen(ScreenPersona)
 	case ScreenDependencyTree:
+		if m.Selection.Preset == model.PresetCustom {
+			allComps := screens.AllComponents()
+			switch {
+			case m.Cursor < len(allComps):
+				m.toggleCurrentComponent()
+			case m.Cursor == len(allComps):
+				m.buildDependencyPlan()
+				m.Review = planner.BuildReviewPayload(m.Selection, m.DependencyPlan)
+				m.setScreen(ScreenReview)
+			default:
+				m.setScreen(ScreenPreset)
+			}
+			return m, nil
+		}
 		if m.Cursor == 0 {
 			m.Review = planner.BuildReviewPayload(m.Selection, m.DependencyPlan)
 			m.setScreen(ScreenReview)
@@ -193,9 +232,10 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 	case ScreenReview:
 		if m.Cursor == 0 {
 			m.setScreen(ScreenInstalling)
+			m.SpinnerFrame = 0
 			m.Progress.Start(0)
 			m.Progress.AppendLog("starting installation")
-			return m, nil
+			return m, tickCmd()
 		}
 		m.setScreen(ScreenDependencyTree)
 	case ScreenInstalling:
@@ -245,6 +285,9 @@ func (m Model) optionCount() int {
 	case ScreenPreset:
 		return len(screens.PresetOptions()) + 1
 	case ScreenDependencyTree:
+		if m.Selection.Preset == model.PresetCustom {
+			return len(screens.AllComponents()) + len(screens.DependencyTreeOptions())
+		}
 		return len(screens.DependencyTreeOptions())
 	case ScreenReview:
 		return len(screens.ReviewOptions())
@@ -274,6 +317,23 @@ func (m *Model) toggleCurrentAgent() {
 	}
 
 	m.Selection.Agents = append(m.Selection.Agents, agent)
+}
+
+func (m *Model) toggleCurrentComponent() {
+	allComps := screens.AllComponents()
+	if m.Cursor >= len(allComps) {
+		return
+	}
+
+	compID := allComps[m.Cursor].ID
+	for idx, selected := range m.Selection.Components {
+		if selected == compID {
+			m.Selection.Components = append(m.Selection.Components[:idx], m.Selection.Components[idx+1:]...)
+			return
+		}
+	}
+
+	m.Selection.Components = append(m.Selection.Components, compID)
 }
 
 func (m *Model) buildDependencyPlan() {

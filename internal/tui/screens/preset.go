@@ -16,6 +16,13 @@ func PresetOptions() []model.PresetID {
 	}
 }
 
+var presetDescriptions = map[model.PresetID]string{
+	model.PresetFullGentleman: "Everything: memory, SDD, skills, docs, persona & security",
+	model.PresetEcosystemOnly: "Core tools only: memory, SDD, skills & docs (no persona/security)",
+	model.PresetMinimal:       "Just Engram persistent memory",
+	model.PresetCustom:        "Pick individual components yourself",
+}
+
 func RenderPreset(selected model.PresetID, cursor int) string {
 	var b strings.Builder
 
@@ -26,6 +33,7 @@ func RenderPreset(selected model.PresetID, cursor int) string {
 		isSelected := preset == selected
 		focused := idx == cursor
 		b.WriteString(renderRadio(string(preset), isSelected, focused))
+		b.WriteString(styles.SubtextStyle.Render("    "+presetDescriptions[preset]) + "\n")
 	}
 
 	b.WriteString("\n")

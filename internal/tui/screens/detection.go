@@ -2,6 +2,7 @@ package screens
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -23,9 +24,10 @@ func RenderDetection(result system.DetectionResult, cursor int) string {
 		styles.HeadingStyle.Render("OS") + "\n" +
 			styles.UnselectedStyle.Render(fmt.Sprintf("%s (%s)", result.System.OS, result.System.Arch)),
 	)
+	shellName := filepath.Base(result.System.Shell)
 	shellCard := styles.StatCardStyle.Render(
 		styles.HeadingStyle.Render("Shell") + "\n" +
-			styles.UnselectedStyle.Render(result.System.Shell),
+			styles.UnselectedStyle.Render(shellName),
 	)
 
 	supportedText := styles.ErrorStyle.Render("No")

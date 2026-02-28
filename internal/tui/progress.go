@@ -59,6 +59,10 @@ func (p *ProgressState) AppendLog(format string, args ...any) {
 	p.Logs = append(p.Logs, fmt.Sprintf(format, args...))
 }
 
+func (p ProgressState) Done() bool {
+	return p.Percent() >= 100
+}
+
 func (p ProgressState) Percent() int {
 	if len(p.Items) == 0 {
 		return 100

@@ -21,7 +21,7 @@ type InstallProgress struct {
 	Failed      bool
 }
 
-func RenderInstalling(progress InstallProgress) string {
+func RenderInstalling(progress InstallProgress, spinner string) string {
 	var b strings.Builder
 
 	b.WriteString(styles.TitleStyle.Render("Installing"))
@@ -41,15 +41,15 @@ func RenderInstalling(progress InstallProgress) string {
 		var icon string
 		switch item.Status {
 		case "succeeded":
-			icon = styles.SuccessStyle.Render("[x]")
+			icon = styles.SuccessStyle.Render("✓")
 		case "failed":
-			icon = styles.ErrorStyle.Render("[!]")
+			icon = styles.ErrorStyle.Render("✗")
 		case "running":
-			icon = styles.WarningStyle.Render("[>]")
+			icon = styles.WarningStyle.Render(spinner)
 		default:
-			icon = styles.SubtextStyle.Render("[-]")
+			icon = styles.SubtextStyle.Render("·")
 		}
-		b.WriteString(fmt.Sprintf("%s %s\n", icon, styles.UnselectedStyle.Render(item.Label)))
+		b.WriteString(fmt.Sprintf("  %s %s\n", icon, styles.UnselectedStyle.Render(item.Label)))
 	}
 
 	if len(progress.Logs) > 0 {
