@@ -125,6 +125,20 @@ func TestInjectOpenCodeWritesCommandFiles(t *testing.T) {
 		t.Fatal("sdd-init.md missing frontmatter description — not real content")
 	}
 
+	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
+	settingsContent, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("ReadFile(opencode.json) error = %v", err)
+	}
+
+	settingsText := string(settingsContent)
+	if !strings.Contains(settingsText, `"agent"`) {
+		t.Fatal("opencode.json missing agent key for SDD commands")
+	}
+	if !strings.Contains(settingsText, `"sdd-orchestrator"`) {
+		t.Fatal("opencode.json missing sdd-orchestrator agent")
+	}
+
 	skillPath := filepath.Join(home, ".config", "opencode", "skill", "sdd-init", "SKILL.md")
 	skillContent, err := os.ReadFile(skillPath)
 	if err != nil {

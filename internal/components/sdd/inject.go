@@ -18,6 +18,10 @@ type InjectionResult struct {
 	Files   []string
 }
 
+// openCodeSDDAgentOverlayJSON ensures OpenCode has the sdd-orchestrator agent
+// required by /sdd-* command frontmatter.
+var openCodeSDDAgentOverlayJSON = []byte("{\n  \"agent\": {\n    \"sdd-orchestrator\": {\n      \"mode\": \"all\",\n      \"description\": \"Gentleman personality + SDD delegate-only orchestrator\",\n      \"prompt\": \"{file:./AGENTS.md}\",\n      \"tools\": {\n        \"read\": true,\n        \"write\": true,\n        \"edit\": true,\n        \"bash\": true\n      }\n    }\n  }\n}\n")
+
 func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 	if !adapter.SupportsSystemPrompt() {
 		return InjectionResult{}, nil
@@ -77,6 +81,20 @@ func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 		}
 	}
 
+	// 2b. OpenCode /sdd-* commands reference agent: sdd-orchestrator.
+	// Ensure that agent is present even when persona component is not installed.
+	if adapter.Agent() == model.AgentOpenCode {
+		settingsPath := adapter.SettingsPath(homeDir)
+		if settingsPath != "" {
+			agentResult, err := mergeJSONFile(settingsPath, openCodeSDDAgentOverlayJSON)
+			if err != nil {
+				return InjectionResult{}, err
+			}
+			changed = changed || agentResult.Changed
+			files = append(files, settingsPath)
+		}
+	}
+
 	// 3. Write SDD skill files (if the agent supports skills).
 	if adapter.SupportsSkills() {
 		skillDir := adapter.SkillsDir(homeDir)
@@ -106,6 +124,23 @@ func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 	}
 
 	return InjectionResult{Changed: changed, Files: files}, nil
+}
+
+func mergeJSONFile(path string, overlay []byte) (filemerge.WriteResult, error) {
+	baseJSON, err := os.ReadFile(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return filemerge.WriteResult{}, fmt.Errorf("read json file %q: %w", path, err)
+		}
+		baseJSON = nil
+	}
+
+	merged, err := filemerge.MergeJSONObjects(baseJSON, overlay)
+	if err != nil {
+		return filemerge.WriteResult{}, err
+	}
+
+	return filemerge.WriteFileAtomic(path, merged, 0o644)
 }
 
 // sddOrchestratorMarker is used to detect if SDD content was already injected

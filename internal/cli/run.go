@@ -38,9 +38,20 @@ type InstallResult struct {
 }
 
 var (
-	osUserHomeDir = os.UserHomeDir
-	runCommand    = executeCommand
+	osUserHomeDir       = os.UserHomeDir
+	runCommand          = executeCommand
+	streamCommandOutput = true
 )
+
+// SetCommandOutputStreaming toggles whether command stdout/stderr is streamed
+// directly to the terminal. It returns a restore function.
+func SetCommandOutputStreaming(enabled bool) func() {
+	previous := streamCommandOutput
+	streamCommandOutput = enabled
+	return func() {
+		streamCommandOutput = previous
+	}
+}
 
 func RunInstall(args []string, detection system.DetectionResult) (InstallResult, error) {
 	flags, err := ParseInstallFlags(args)
@@ -416,9 +427,22 @@ func runCommandSequence(commands [][]string) error {
 
 func executeCommand(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+
+	if streamCommandOutput {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if len(output) > 0 {
+			return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))
+		}
+		return err
+	}
+
+	return nil
 }
 
 // selectedSkillIDs returns the skill IDs to install. If the selection

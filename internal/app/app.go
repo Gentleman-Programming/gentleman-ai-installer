@@ -78,6 +78,9 @@ func tuiExecute(
 	detection system.DetectionResult,
 	onProgress pipeline.ProgressFunc,
 ) pipeline.ExecutionResult {
+	restoreCommandOutput := cli.SetCommandOutputStreaming(false)
+	defer restoreCommandOutput()
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return pipeline.ExecutionResult{Err: fmt.Errorf("resolve user home directory: %w", err)}
