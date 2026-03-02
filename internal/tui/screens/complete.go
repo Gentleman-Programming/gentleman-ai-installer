@@ -13,17 +13,9 @@ func RenderComplete(configuredAgents int, installedComponents int) string {
 	b.WriteString(styles.SuccessStyle.Render("Done! Your AI agents are ready."))
 	b.WriteString("\n\n")
 
-	agentsCard := styles.StatCardStyle.Render(
-		styles.HeadingStyle.Render("Configured agents") + "\n" +
-			styles.SuccessStyle.Render(fmt.Sprintf("%d", configuredAgents)),
-	)
-	componentsCard := styles.StatCardStyle.Render(
-		styles.HeadingStyle.Render("Installed components") + "\n" +
-			styles.SuccessStyle.Render(fmt.Sprintf("%d", installedComponents)),
-	)
-
-	b.WriteString(agentsCard + "  " + componentsCard)
-	b.WriteString("\n\n")
+	b.WriteString("  " + styles.HeadingStyle.Render("Configured agents") + "  " + styles.SuccessStyle.Render(fmt.Sprintf("%d", configuredAgents)) + "\n")
+	b.WriteString("  " + styles.HeadingStyle.Render("Installed components") + "  " + styles.SuccessStyle.Render(fmt.Sprintf("%d", installedComponents)) + "\n")
+	b.WriteString("\n")
 
 	b.WriteString(styles.HeadingStyle.Render("Next steps"))
 	b.WriteString("\n")

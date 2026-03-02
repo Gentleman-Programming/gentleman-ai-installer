@@ -50,11 +50,6 @@ var (
 	UnselectedStyle = lipgloss.NewStyle().
 			Foreground(ColorText)
 
-	StatCardStyle = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder()).
-			BorderForeground(ColorOverlay).
-			Padding(0, 1)
-
 	SuccessStyle = lipgloss.NewStyle().
 			Foreground(ColorGreen)
 

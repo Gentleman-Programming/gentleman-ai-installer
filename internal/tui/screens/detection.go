@@ -20,26 +20,17 @@ func RenderDetection(result system.DetectionResult, cursor int) string {
 	b.WriteString(styles.TitleStyle.Render("System Detection"))
 	b.WriteString("\n\n")
 
-	osCard := styles.StatCardStyle.Render(
-		styles.HeadingStyle.Render("OS") + "\n" +
-			styles.UnselectedStyle.Render(fmt.Sprintf("%s (%s)", result.System.OS, result.System.Arch)),
-	)
-	shellName := filepath.Base(result.System.Shell)
-	shellCard := styles.StatCardStyle.Render(
-		styles.HeadingStyle.Render("Shell") + "\n" +
-			styles.UnselectedStyle.Render(shellName),
-	)
-
 	supportedText := styles.ErrorStyle.Render("No")
 	if result.System.Supported {
 		supportedText = styles.SuccessStyle.Render("Yes")
 	}
-	supportedCard := styles.StatCardStyle.Render(
-		styles.HeadingStyle.Render("Supported") + "\n" + supportedText,
-	)
 
-	b.WriteString(osCard + "  " + shellCard + "  " + supportedCard)
-	b.WriteString("\n\n")
+	shellName := filepath.Base(result.System.Shell)
+
+	b.WriteString(fmt.Sprintf("  %s  %s\n", styles.HeadingStyle.Render("OS"), styles.UnselectedStyle.Render(fmt.Sprintf("%s (%s)", result.System.OS, result.System.Arch))))
+	b.WriteString(fmt.Sprintf("  %s  %s\n", styles.HeadingStyle.Render("Shell"), styles.UnselectedStyle.Render(shellName)))
+	b.WriteString(fmt.Sprintf("  %s  %s\n", styles.HeadingStyle.Render("Supported"), supportedText))
+	b.WriteString("\n")
 
 	if len(result.Tools) > 0 {
 		b.WriteString(styles.HeadingStyle.Render("Tools"))

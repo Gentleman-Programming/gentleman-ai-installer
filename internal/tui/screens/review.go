@@ -18,21 +18,10 @@ func RenderReview(payload planner.ReviewPayload, cursor int) string {
 	b.WriteString(styles.TitleStyle.Render("Review and Confirm"))
 	b.WriteString("\n\n")
 
-	agentsCard := styles.StatCardStyle.Render(
-		styles.HeadingStyle.Render("Agents") + "\n" +
-			styles.UnselectedStyle.Render(joinIDs(payload.Agents)),
-	)
-	personaCard := styles.StatCardStyle.Render(
-		styles.HeadingStyle.Render("Persona") + "\n" +
-			styles.UnselectedStyle.Render(string(payload.Persona)),
-	)
-	presetCard := styles.StatCardStyle.Render(
-		styles.HeadingStyle.Render("Preset") + "\n" +
-			styles.UnselectedStyle.Render(string(payload.Preset)),
-	)
-
-	b.WriteString(agentsCard + "  " + personaCard + "  " + presetCard)
-	b.WriteString("\n\n")
+	b.WriteString("  " + styles.HeadingStyle.Render("Agents") + "  " + styles.UnselectedStyle.Render(joinIDs(payload.Agents)) + "\n")
+	b.WriteString("  " + styles.HeadingStyle.Render("Persona") + "  " + styles.UnselectedStyle.Render(string(payload.Persona)) + "\n")
+	b.WriteString("  " + styles.HeadingStyle.Render("Preset") + "  " + styles.UnselectedStyle.Render(string(payload.Preset)) + "\n")
+	b.WriteString("\n")
 
 	if len(payload.Components) > 0 {
 		autoSet := make(map[model.ComponentID]struct{}, len(payload.AddedDependencies))
