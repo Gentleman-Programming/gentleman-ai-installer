@@ -128,6 +128,98 @@ func TestPipelineDoneMsgMarksCompletion(t *testing.T) {
 	}
 }
 
+func TestPipelineDoneMsgReflectsFailedSteps(t *testing.T) {
+	m := NewModel(system.DetectionResult{}, "dev")
+	m.Screen = ScreenInstalling
+	m.pipelineRunning = true
+	m.Progress = NewProgressState([]string{"agent:opencode", "component:sdd"})
+	m.Progress.Start(0)
+	m.Progress.AppendLog("starting installation")
+
+	result := pipeline.ExecutionResult{
+		Apply: pipeline.StageResult{
+			Steps: []pipeline.StepResult{
+				{StepID: "agent:opencode", Status: pipeline.StepStatusFailed, Err: fmt.Errorf("npm not found")},
+				{StepID: "component:sdd", Status: pipeline.StepStatusSucceeded},
+			},
+			Success: false,
+			Err:     fmt.Errorf("npm not found"),
+		},
+		Err: fmt.Errorf("npm not found"),
+	}
+
+	updated, _ := m.Update(PipelineDoneMsg{Result: result})
+	state := updated.(Model)
+
+	// The failed step must show as failed, not succeeded.
+	if state.Progress.Items[0].Status != string(pipeline.StepStatusFailed) {
+		t.Fatalf("agent:opencode status = %q, want failed", state.Progress.Items[0].Status)
+	}
+	if state.Progress.Items[1].Status != string(pipeline.StepStatusSucceeded) {
+		t.Fatalf("component:sdd status = %q, want succeeded", state.Progress.Items[1].Status)
+	}
+	if !state.Progress.HasFailures() {
+		t.Fatalf("expected HasFailures() = true")
+	}
+
+	// Logs must include the specific error.
+	foundError := false
+	for _, log := range state.Progress.Logs {
+		if log == "FAILED: agent:opencode — npm not found" {
+			foundError = true
+		}
+	}
+	if !foundError {
+		t.Fatalf("expected error detail in logs, got: %v", state.Progress.Logs)
+	}
+}
+
+func TestPipelineDoneMsgPreservesExistingLogs(t *testing.T) {
+	m := NewModel(system.DetectionResult{}, "dev")
+	m.Screen = ScreenInstalling
+	m.pipelineRunning = true
+	m.Progress = NewProgressState([]string{"step-a"})
+	m.Progress.Start(0)
+	m.Progress.AppendLog("starting installation")
+
+	result := pipeline.ExecutionResult{
+		Apply: pipeline.StageResult{
+			Steps:   []pipeline.StepResult{{StepID: "step-a", Status: pipeline.StepStatusSucceeded}},
+			Success: true,
+		},
+	}
+
+	updated, _ := m.Update(PipelineDoneMsg{Result: result})
+	state := updated.(Model)
+
+	if len(state.Progress.Logs) < 2 {
+		t.Fatalf("expected at least 2 logs (original + completion), got %d", len(state.Progress.Logs))
+	}
+	if state.Progress.Logs[0] != "starting installation" {
+		t.Fatalf("first log = %q, want 'starting installation'", state.Progress.Logs[0])
+	}
+}
+
+func TestInstallingWithFailuresQuitsInsteadOfComplete(t *testing.T) {
+	m := NewModel(system.DetectionResult{}, "dev")
+	m.Screen = ScreenInstalling
+	// Set up progress with a failure.
+	m.Progress = NewProgressState([]string{"step-a"})
+	m.Progress.Mark(0, string(pipeline.StepStatusFailed))
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	state := updated.(Model)
+
+	// Should NOT transition to ScreenComplete.
+	if state.Screen == ScreenComplete {
+		t.Fatalf("should not go to ScreenComplete when there are failures")
+	}
+	// Should issue a quit command.
+	if cmd == nil {
+		t.Fatalf("expected tea.Quit command when pressing Enter on failed installation")
+	}
+}
+
 func TestInstallingScreenManualFallbackWithoutExecuteFn(t *testing.T) {
 	m := NewModel(system.DetectionResult{}, "dev")
 	m.Screen = ScreenInstalling

@@ -70,7 +70,11 @@ func RenderInstalling(progress InstallProgress, spinner string) string {
 		b.WriteString("\n")
 		succeeded, failed := countResults(progress.Items)
 		if progress.Failed {
-			b.WriteString(styles.WarningStyle.Render(fmt.Sprintf("Completed with errors: %d succeeded, %d failed", succeeded, failed)))
+			b.WriteString(styles.ErrorStyle.Render(fmt.Sprintf("Completed with errors: %d succeeded, %d failed.", succeeded, failed)))
+			b.WriteString("\n")
+			b.WriteString(styles.WarningStyle.Render("Some steps failed — the installed files were rolled back."))
+			b.WriteString("\n")
+			b.WriteString(styles.WarningStyle.Render("Check the logs above, fix the issue, and re-run the installer."))
 			b.WriteString("\n")
 		} else {
 			b.WriteString(styles.SuccessStyle.Render(fmt.Sprintf("All %d steps completed successfully.", succeeded)))

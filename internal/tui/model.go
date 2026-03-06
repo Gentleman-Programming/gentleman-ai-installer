@@ -184,18 +184,27 @@ func (m Model) handlePipelineDone(msg PipelineDoneMsg) (tea.Model, tea.Cmd) {
 	m.Execution = msg.Result
 	m.pipelineRunning = false
 
-	// Mark any remaining pending items as done (edge case: empty pipeline).
-	if m.Progress.Percent() < 100 {
-		for i := range m.Progress.Items {
-			if m.Progress.Items[i].Status == ProgressStatusPending ||
-				m.Progress.Items[i].Status == ProgressStatusRunning {
-				m.Progress.Mark(i, string(pipeline.StepStatusSucceeded))
+	// Rebuild progress from the actual execution results so each step
+	// reflects its real status (succeeded, failed, rolled-back, etc.)
+	// instead of blindly marking everything as succeeded.
+	logs := append([]string(nil), m.Progress.Logs...)
+	m.Progress = ProgressFromExecution(msg.Result)
+	m.Progress.Logs = logs
+
+	// Log specific errors so the user knows exactly what failed.
+	logStepErrors := func(stage pipeline.StageResult) {
+		for _, step := range stage.Steps {
+			if step.Err != nil {
+				m.Progress.AppendLog("FAILED: %s — %s", step.StepID, step.Err.Error())
 			}
 		}
 	}
+	logStepErrors(msg.Result.Prepare)
+	logStepErrors(msg.Result.Apply)
+	logStepErrors(msg.Result.Rollback)
 
 	if msg.Result.Err != nil {
-		m.Progress.AppendLog("pipeline completed with errors")
+		m.Progress.AppendLog("pipeline completed with errors — check the failures above")
 	} else {
 		m.Progress.AppendLog("pipeline completed successfully")
 	}
@@ -359,6 +368,10 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 		m.setScreen(ScreenDependencyTree)
 	case ScreenInstalling:
 		if m.Progress.Done() {
+			if m.Progress.HasFailures() {
+				// Don't show the "all ready" screen when steps failed.
+				return m, tea.Quit
+			}
 			m.setScreen(ScreenComplete)
 			return m, nil
 		}
