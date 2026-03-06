@@ -29,6 +29,7 @@ const (
 	LinuxDistroUbuntu  = "ubuntu"
 	LinuxDistroDebian  = "debian"
 	LinuxDistroArch    = "arch"
+	LinuxDistroFedora  = "fedora"
 )
 
 type DetectionResult struct {
@@ -122,6 +123,9 @@ func resolvePlatformProfile(goos, linuxOSRelease string) PlatformProfile {
 		case LinuxDistroArch:
 			profile.PackageManager = "pacman"
 			profile.Supported = true
+		case LinuxDistroFedora:
+			profile.PackageManager = "dnf"
+			profile.Supported = true
 		default:
 			profile.PackageManager = ""
 			profile.Supported = false
@@ -168,6 +172,10 @@ func detectLinuxDistro(linuxOSRelease string) string {
 
 	if isArchLike(id, idLike) {
 		return LinuxDistroArch
+	}
+
+	if id == LinuxDistroFedora {
+		return LinuxDistroFedora
 	}
 
 	return LinuxDistroUnknown
