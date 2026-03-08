@@ -1,0 +1,93 @@
+name: Update AUR Package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  update-aur:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get release info
+        id: release
+        run: |
+          VERSION=$(curl -s https://api.github.com/repos/Gentleman-Programming/gentle-ai/releases/latest | jq -r .tag_name | sed 's/v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download checksums
+        run: |
+          curl -sL "https://github.com/Gentleman-Programming/gentle-ai/releases/download/v${{ steps.release.outputs.version }}/checksums.txt" -o /tmp/checksums.txt
+          cat /tmp/checksums.txt
+
+      - name: Extract checksums
+        id: checksums
+        run: |
+          AMD64_HASH=$(grep "gentle-ai_${{ steps.release.outputs.version }}_linux_amd64.tar.gz" /tmp/checksums.txt | awk '{print $1}')
+          ARM64_HASH=$(grep "gentle-ai_${{ steps.release.outputs.version }}_linux_arm64.tar.gz" /tmp/checksums.txt | awk '{print $1}')
+          echo "amd64_hash=$AMD64_HASH" >> $GITHUB_OUTPUT
+          echo "arm64_hash=$ARM64_HASH" >> $GITHUB_OUTPUT
+
+      - name: Update PKGBUILD
+        run: |
+          # Update pkgver
+          sed -i "s/^pkgver=.*/pkgver=${{ steps.release.outputs.version }}/" PKGBUILD
+          
+          # Update checksums
+          sed -i "s/sha256sums_x86_64=('.*')/sha256sums_x86_64=('${{ steps.checksums.outputs.amd64_hash }}')/" PKGBUILD
+          sed -i "s/sha256sums_aarch64=('.*')/sha256sums_aarch64=('${{ steps.checksums.outputs.arm64_hash }}')/" PKGBUILD
+          
+          cat PKGBUILD
+
+      - name: Update .SRCINFO
+        run: |
+          cat > .SRCINFO << EOF
+          pkgbase = gentle-ai
+              pkgdesc = AI Gentle Stack - Ecosystem configurator for AI coding agents
+              pkgver = ${{ steps.release.outputs.version }}
+              pkgrel = 1
+              url = https://github.com/Gentleman-Programming/gentle-ai
+              license = MIT
+              arch = x86_64
+              arch = aarch64
+              provides = gentle-ai
+              conflicts = gentle-ai
+              source_x86_64 = gentle-ai_${{ steps.release.outputs.version }}_linux_amd64.tar.gz::https://github.com/Gentleman-Programming/gentle-ai/releases/download/v${{ steps.release.outputs.version }}/gentle-ai_${{ steps.release.outputs.version }}_linux_amd64.tar.gz
+              sha256sums_x86_64 = ${{ steps.checksums.outputs.amd64_hash }}
+              source_aarch64 = gentle-ai_${{ steps.release.outputs.version }}_linux_arm64.tar.gz::https://github.com/Gentleman-Programming/gentle-ai/releases/download/v${{ steps.release.outputs.version }}/gentle-ai_${{ steps.release.outputs.version }}_linux_arm64.tar.gz
+              sha256sums_aarch64 = ${{ steps.checksums.outputs.arm64_hash }}
+
+          pkgname = gentle-ai
+          EOF
+          cat .SRCINFO
+
+      - name: Commit and push to AUR
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
+        run: |
+          git config --global user.name "gentle-ai[bot]"
+          git config --global user.email "info@gentlemanprogramming.dev"
+          
+          mkdir -p ~/.ssh
+          echo "$AUR_SSH_KEY" | base64 -d > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
+          
+          # Clone AUR repo to a separate directory
+          git clone ssh://aur@aur.archlinux.org/gentle-ai.git /tmp/aur
+          cd /tmp/aur
+          
+          # Copy updated files from the fork
+          cp $GITHUB_WORKSPACE/PKGBUILD .
+          cp $GITHUB_WORKSPACE/LICENSE .
+          cp $GITHUB_WORKSPACE/.SRCINFO .
+          
+          # Commit and push
+          git add PKGBUILD LICENSE .SRCINFO
+          git commit -m "Update to v${{ steps.release.outputs.version }}" || echo "No changes to commit"
+          git push origin master
