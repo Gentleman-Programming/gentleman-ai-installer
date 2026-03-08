@@ -135,10 +135,12 @@ func resolveGGAInstall(profile system.PlatformProfile) (CommandSequence, error) 
 		// On Windows, use Git Bash explicitly to avoid bare "bash" resolving to
 		// C:\Windows\System32\bash.exe (WSL), which cannot run the script.
 		// Clean up any leftover directory from a previous run before cloning.
+		// PowerShell is used for cleanup to avoid cmd.exe quoting issues with
+		// embedded double quotes in the "if exist ... rmdir" approach.
 		cloneDst := filepath.Join(os.TempDir(), "gentleman-guardian-angel")
 		bash := gitBashPath()
 		return CommandSequence{
-			{"cmd", "/c", fmt.Sprintf(`if exist "%s" rmdir /s /q "%s"`, cloneDst, cloneDst)},
+			{"powershell", "-NoProfile", "-Command", fmt.Sprintf("Remove-Item -Recurse -Force -ErrorAction SilentlyContinue '%s'", cloneDst)},
 			{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", cloneDst},
 			{bash, bashScriptPath(profile, filepath.Join(cloneDst, "install.sh"))},
 		}, nil
@@ -156,6 +158,10 @@ func bashScriptPath(profile system.PlatformProfile, path string) string {
 	}
 	return path
 }
+
+// GitBashPath is the exported wrapper so other packages (e.g. cli) can
+// resolve the Git Bash binary without duplicating the detection logic.
+func GitBashPath() string { return gitBashPath() }
 
 // gitBashPath returns the path to Git Bash on Windows.
 // It resolves git on PATH, then finds bash.exe relative to it

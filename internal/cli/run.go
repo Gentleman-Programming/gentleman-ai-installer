@@ -19,6 +19,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/components/sdd"
 	"github.com/gentleman-programming/gentle-ai/internal/components/skills"
 	"github.com/gentleman-programming/gentle-ai/internal/components/theme"
+	"github.com/gentleman-programming/gentle-ai/internal/installcmd"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
 	"github.com/gentleman-programming/gentle-ai/internal/pipeline"
 	"github.com/gentleman-programming/gentle-ai/internal/planner"
@@ -385,8 +386,8 @@ func (s componentApplyStep) Run() error {
 		}
 		return nil
 	case model.ComponentGGA:
-		if _, err := cmdLookPath("gga"); err != nil {
-			// GGA not on PATH — install it.
+		if !ggaAvailable(s.profile) {
+			// GGA not found on any known PATH — install it.
 			commands, err := gga.InstallCommand(s.profile)
 			if err != nil {
 				return fmt.Errorf("resolve install command for component %q: %w", s.component, err)
@@ -475,6 +476,22 @@ func ResolveInstallProfile(detection system.DetectionResult) system.PlatformProf
 		PackageManager: "brew",
 		Supported:      true,
 	}
+}
+
+// ggaAvailable reports whether the gga binary is reachable. On Windows, gga is
+// installed into Git Bash's PATH (~/.local/bin) which is invisible to the
+// Windows PATH. We check both Windows PATH and Git Bash's PATH so we don't
+// attempt a re-install on every run when gga is already present.
+func ggaAvailable(profile system.PlatformProfile) bool {
+	if _, err := cmdLookPath("gga"); err == nil {
+		return true
+	}
+	if profile.OS != "windows" {
+		return false
+	}
+	bash := installcmd.GitBashPath()
+	cmd := exec.Command(bash, "-c", "command -v gga >/dev/null 2>&1")
+	return cmd.Run() == nil
 }
 
 // runCommandSequence runs each command in the sequence one at a time, stopping on first error.
