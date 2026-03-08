@@ -1,6 +1,8 @@
 package gga
 
 import (
+	"fmt"
+	"os"
 	"reflect"
 	"testing"
 
@@ -23,6 +25,7 @@ func TestInstallCommandByProfile(t *testing.T) {
 			name:    "ubuntu uses git clone and install.sh",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
 			want: [][]string{
+				{"rm", "-rf", "/tmp/gentleman-guardian-angel"},
 				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", "/tmp/gentleman-guardian-angel"},
 				{"bash", "/tmp/gentleman-guardian-angel/install.sh"},
 			},
@@ -31,8 +34,18 @@ func TestInstallCommandByProfile(t *testing.T) {
 			name:    "arch uses git clone and install.sh",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
 			want: [][]string{
+				{"rm", "-rf", "/tmp/gentleman-guardian-angel"},
 				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", "/tmp/gentleman-guardian-angel"},
 				{"bash", "/tmp/gentleman-guardian-angel/install.sh"},
+			},
+		},
+		{
+			name:    "windows cleans temp dir before cloning",
+			profile: system.PlatformProfile{OS: "windows", PackageManager: "winget"},
+			want: [][]string{
+				{"cmd", "/c", fmt.Sprintf(`if exist "%s" rmdir /s /q "%s"`, os.TempDir()+"\\gentleman-guardian-angel", os.TempDir()+"\\gentleman-guardian-angel")},
+				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", os.TempDir() + "\\gentleman-guardian-angel"},
+				{"bash", os.TempDir() + "\\gentleman-guardian-angel\\install.sh"},
 			},
 		},
 		{

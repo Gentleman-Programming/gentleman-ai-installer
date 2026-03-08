@@ -118,15 +118,20 @@ func resolveGGAInstall(profile system.PlatformProfile) (CommandSequence, error) 
 			{"brew", "install", "gga"},
 		}, nil
 	case "apt", "pacman":
+		const tmpDir = "/tmp/gentleman-guardian-angel"
 		return CommandSequence{
-			{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", "/tmp/gentleman-guardian-angel"},
-			{"bash", "/tmp/gentleman-guardian-angel/install.sh"},
+			{"rm", "-rf", tmpDir},
+			{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", tmpDir},
+			{"bash", tmpDir + "/install.sh"},
 		}, nil
 	case "winget":
 		// On Windows, use Git Bash (bundled with Git for Windows) to run the install script.
+		// Clean up any leftover directory from a previous run before cloning.
+		tmpDir := os.TempDir() + "\\gentleman-guardian-angel"
 		return CommandSequence{
-			{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", os.TempDir() + "\\gentleman-guardian-angel"},
-			{"bash", os.TempDir() + "\\gentleman-guardian-angel\\install.sh"},
+			{"cmd", "/c", fmt.Sprintf(`if exist "%s" rmdir /s /q "%s"`, tmpDir, tmpDir)},
+			{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", tmpDir},
+			{"bash", tmpDir + "\\install.sh"},
 		}, nil
 	default:
 		return nil, fmt.Errorf(

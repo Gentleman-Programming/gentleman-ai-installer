@@ -1,6 +1,7 @@
 package installcmd
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -210,6 +211,7 @@ func TestResolveComponentInstall(t *testing.T) {
 			profile:   system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
 			component: model.ComponentGGA,
 			want: CommandSequence{
+				{"rm", "-rf", "/tmp/gentleman-guardian-angel"},
 				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", "/tmp/gentleman-guardian-angel"},
 				{"bash", "/tmp/gentleman-guardian-angel/install.sh"},
 			},
@@ -219,6 +221,7 @@ func TestResolveComponentInstall(t *testing.T) {
 			profile:   system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
 			component: model.ComponentGGA,
 			want: CommandSequence{
+				{"rm", "-rf", "/tmp/gentleman-guardian-angel"},
 				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", "/tmp/gentleman-guardian-angel"},
 				{"bash", "/tmp/gentleman-guardian-angel/install.sh"},
 			},
@@ -230,10 +233,11 @@ func TestResolveComponentInstall(t *testing.T) {
 			want:      CommandSequence{{"go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}},
 		},
 		{
-			name:      "gga on windows uses git clone and bash via temp dir",
+			name:      "gga on windows cleans temp dir before cloning",
 			profile:   system.PlatformProfile{OS: "windows", PackageManager: "winget"},
 			component: model.ComponentGGA,
 			want: CommandSequence{
+				{"cmd", "/c", fmt.Sprintf(`if exist "%s" rmdir /s /q "%s"`, os.TempDir()+"\\gentleman-guardian-angel", os.TempDir()+"\\gentleman-guardian-angel")},
 				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", os.TempDir() + "\\gentleman-guardian-angel"},
 				{"bash", os.TempDir() + "\\gentleman-guardian-angel\\install.sh"},
 			},
