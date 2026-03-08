@@ -11,8 +11,9 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
 
-// cmdLookPath is a package-level var for testability.
+// cmdLookPath and osStat are package-level vars for testability.
 var cmdLookPath = exec.LookPath
+var osStat = os.Stat
 
 // CommandSequence represents an ordered list of commands to run in sequence.
 // Each inner slice is a single command with its arguments (e.g., ["brew", "install", "engram"]).
@@ -169,13 +170,13 @@ func gitBashPath() string {
 		parent := filepath.Dir(gitDir)  // .../Git
 
 		candidate := filepath.Join(parent, "bin", "bash.exe")
-		if _, err := os.Stat(candidate); err == nil {
+		if _, err := osStat(candidate); err == nil {
 			return candidate
 		}
 
 		// git might already be in bin/ (not cmd/).
 		candidate = filepath.Join(gitDir, "bash.exe")
-		if _, err := os.Stat(candidate); err == nil {
+		if _, err := osStat(candidate); err == nil {
 			return candidate
 		}
 	}
@@ -191,7 +192,7 @@ func gitBashPath() string {
 		if c == "" {
 			continue
 		}
-		if _, err := os.Stat(c); err == nil {
+		if _, err := osStat(c); err == nil {
 			return c
 		}
 	}

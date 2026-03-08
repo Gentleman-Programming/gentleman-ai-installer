@@ -117,11 +117,17 @@ func TestGitBashPathResolvesFromGitOnPath(t *testing.T) {
 }
 
 func TestGitBashPathFallsBackToBareWhenNoGit(t *testing.T) {
-	original := cmdLookPath
+	origLookPath := cmdLookPath
 	cmdLookPath = func(file string) (string, error) {
 		return "", fmt.Errorf("not found")
 	}
-	t.Cleanup(func() { cmdLookPath = original })
+	t.Cleanup(func() { cmdLookPath = origLookPath })
+
+	origStat := osStat
+	osStat = func(name string) (os.FileInfo, error) {
+		return nil, fmt.Errorf("not found")
+	}
+	t.Cleanup(func() { osStat = origStat })
 
 	got := gitBashPath()
 	if got != "bash" {
