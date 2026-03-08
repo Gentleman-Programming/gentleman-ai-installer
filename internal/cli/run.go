@@ -19,7 +19,6 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/components/sdd"
 	"github.com/gentleman-programming/gentle-ai/internal/components/skills"
 	"github.com/gentleman-programming/gentle-ai/internal/components/theme"
-	"github.com/gentleman-programming/gentle-ai/internal/installcmd"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
 	"github.com/gentleman-programming/gentle-ai/internal/pipeline"
 	"github.com/gentleman-programming/gentle-ai/internal/planner"
@@ -478,20 +477,21 @@ func ResolveInstallProfile(detection system.DetectionResult) system.PlatformProf
 	}
 }
 
-// ggaAvailable reports whether the gga binary is reachable. On Windows, gga is
-// installed into Git Bash's PATH (~/.local/bin) which is invisible to the
-// Windows PATH. We check both Windows PATH and Git Bash's PATH so we don't
-// attempt a re-install on every run when gga is already present.
-func ggaAvailable(profile system.PlatformProfile) bool {
+// ggaAvailable reports whether the gga binary is reachable. gga is often
+// installed to ~/.local/bin (the default for install.sh on Linux and Git Bash
+// on Windows), which is not always added to the process PATH. We check the
+// filesystem directly to avoid spawning a subprocess and to work regardless
+// of whether ~/.local/bin has been added to PATH.
+func ggaAvailable(_ system.PlatformProfile) bool {
 	if _, err := cmdLookPath("gga"); err == nil {
 		return true
 	}
-	if profile.OS != "windows" {
+	homeDir, err := osUserHomeDir()
+	if err != nil {
 		return false
 	}
-	bash := installcmd.GitBashPath()
-	cmd := exec.Command(bash, "-c", "command -v gga >/dev/null 2>&1")
-	return cmd.Run() == nil
+	_, err = osStat(filepath.Join(homeDir, ".local", "bin", "gga"))
+	return err == nil
 }
 
 // runCommandSequence runs each command in the sequence one at a time, stopping on first error.
