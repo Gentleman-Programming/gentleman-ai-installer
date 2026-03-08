@@ -10,13 +10,20 @@ func WelcomeOptions() []string {
 	return []string{"Start installation", "Manage backups", "Quit"}
 }
 
-func RenderWelcome(cursor int, version string) string {
+func RenderWelcome(cursor int, version string, updateBanner string) string {
 	var b strings.Builder
 
 	b.WriteString(styles.RenderLogo())
 	b.WriteString("\n\n")
 	b.WriteString(styles.SubtextStyle.Render(styles.Tagline(version)))
-	b.WriteString("\n\n")
+	b.WriteString("\n")
+
+	if updateBanner != "" {
+		b.WriteString(styles.WarningStyle.Render(updateBanner))
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
 	b.WriteString(styles.HeadingStyle.Render("Menu"))
 	b.WriteString("\n\n")
 	b.WriteString(renderOptions(WelcomeOptions(), cursor))

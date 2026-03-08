@@ -68,8 +68,14 @@ func TestInstallPlannerParityWithTUISelection(t *testing.T) {
 
 // --- Batch D: App guard-flow tests ---
 
+func TestGuardAcceptsWindows(t *testing.T) {
+	if err := system.EnsureSupportedOS("windows"); err != nil {
+		t.Fatalf("expected windows to be accepted, got %v", err)
+	}
+}
+
 func TestGuardRejectsUnsupportedOS(t *testing.T) {
-	err := system.EnsureSupportedOS("windows")
+	err := system.EnsureSupportedOS("freebsd")
 	if err == nil {
 		t.Fatalf("expected error for unsupported OS")
 	}

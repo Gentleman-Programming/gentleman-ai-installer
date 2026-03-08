@@ -20,6 +20,16 @@ When falling back to `none`, recommend the user enable `engram` or `openspec` fo
 | `openspec` | Filesystem (see `openspec-convention.md`) | Filesystem | Yes |
 | `none` | Orchestrator prompt context | Nowhere | Never |
 
+## State Persistence (Orchestrator)
+
+The orchestrator persists DAG state after each phase transition. This enables SDD recovery after context compaction.
+
+| Mode | Persist State | Recover State |
+|------|--------------|---------------|
+| `engram` | `mem_save(topic_key: "sdd/{change-name}/state")` | `mem_search("sdd/*/state")` → `mem_get_observation(id)` |
+| `openspec` | Write `openspec/changes/{change-name}/state.yaml` | Read `openspec/changes/{change-name}/state.yaml` |
+| `none` | Not possible — state lives only in context | Not possible — warn user |
+
 ## Common Rules
 
 - If mode is `none`, do NOT create or modify any project files. Return results inline only.

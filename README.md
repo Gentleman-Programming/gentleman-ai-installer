@@ -61,7 +61,7 @@ This is NOT an AI agent installer. Most agents are easy to install. This is an *
 
 - **Engram** -- persistent cross-session memory
 - **SDD** -- Spec-Driven Development workflow (plan before you code)
-- **Skills** -- 21 curated coding patterns for modern stacks (React 19, Next.js 15, TypeScript, Tailwind 4, etc.)
+- **Skills** -- curated coding patterns (SDD workflow + foundation skills like Go testing and skill creation)
 - **MCP servers** -- Context7 for real-time library documentation
 - **GGA** -- Gentleman Guardian Angel AI provider switcher
 - **Persona & config** -- security-first permissions, teaching-oriented persona, themes
@@ -161,28 +161,28 @@ All agents receive the **full SDD orchestrator** (agent-teams-lite) injected int
 
 ## Skills
 
-21 curated skill files organized by category, injected into your agent's configuration:
+11 curated skill files organized by category, injected into your agent's configuration:
 
 ### SDD (Spec-Driven Development)
 
-| Skill | ID | Priority |
-|-------|-----|----------|
-| SDD Init | `sdd-init` | P0 |
-| SDD Explore | `sdd-explore` | P0 |
-| SDD Propose | `sdd-propose` | P0 |
-| SDD Spec | `sdd-spec` | P0 |
-| SDD Design | `sdd-design` | P0 |
-| SDD Tasks | `sdd-tasks` | P0 |
-| SDD Apply | `sdd-apply` | P0 |
-| SDD Verify | `sdd-verify` | P0 |
-| SDD Archive | `sdd-archive` | P0 |
+| Skill | ID | Description |
+|-------|-----|-------------|
+| SDD Init | `sdd-init` | Bootstrap SDD context in a project |
+| SDD Explore | `sdd-explore` | Investigate codebase before committing to a change |
+| SDD Propose | `sdd-propose` | Create change proposal with intent, scope, approach |
+| SDD Spec | `sdd-spec` | Write specifications with requirements and scenarios |
+| SDD Design | `sdd-design` | Technical design with architecture decisions |
+| SDD Tasks | `sdd-tasks` | Break down a change into implementation tasks |
+| SDD Apply | `sdd-apply` | Implement tasks following specs and design |
+| SDD Verify | `sdd-verify` | Validate implementation matches specs |
+| SDD Archive | `sdd-archive` | Sync delta specs to main specs and archive |
 
 ### Foundation
 
-| Skill | ID | Priority |
-|-------|-----|----------|
-| Go Testing | `go-testing` | P0 |
-| Skill Creator | `skill-creator` | P0 |
+| Skill | ID | Description |
+|-------|-----|-------------|
+| Go Testing | `go-testing` | Go testing patterns including Bubbletea TUI testing |
+| Skill Creator | `skill-creator` | Create new AI agent skills following the Agent Skills spec |
 
 These foundation skills are installed by default with both `full-gentleman` and `ecosystem-only` presets.
 
@@ -289,8 +289,17 @@ Release binaries are built for `linux`, `darwin`, and `windows` on both `amd64` 
 - **npm global installs** do not require `sudo` on Windows (user-writable by default).
 - **curl** is pre-installed on Windows 10+ and does not require separate installation.
 - **PowerShell** is the default shell when `$SHELL` is not set.
-- VS Code Copilot config is resolved via `%APPDATA%\Code\User\`.
 - Release archives use `.zip` format on Windows (`.tar.gz` on macOS/Linux).
+
+### Windows Config Paths
+
+| Agent | Windows Config Path |
+|-------|-------------------|
+| Claude Code | `%USERPROFILE%\.claude\` |
+| OpenCode | `%USERPROFILE%\.config\opencode\` |
+| Gemini CLI | `%USERPROFILE%\.gemini\` |
+| Cursor | `%USERPROFILE%\.cursor\` |
+| VS Code Copilot | `%APPDATA%\Code\User\` (settings, MCP, prompts) + `%USERPROFILE%\.copilot\` (skills) |
 
 ---
 
@@ -305,7 +314,7 @@ internal/
   system/                  OS/distro detection, dependency checks, platform guards
   cli/                     Install flags, validation, orchestration, dry-run
   planner/                 Dependency graph, resolution, ordering, review payloads
-  installcmd/              Profile-aware command resolver (brew/apt/pacman/go install)
+  installcmd/              Profile-aware command resolver (brew/apt/pacman/winget/go install)
   pipeline/                Staged execution + rollback orchestration
   backup/                  Config snapshot + restore
   assets/                  Embedded skill files + persona templates
@@ -342,11 +351,12 @@ gentle-ai.exe install --dry-run --agent claude-code --preset minimal
 
 Test coverage:
 
-- **22 test packages** across the codebase
-- **164+ unit tests** with **250+ assertions**
+- **26 test packages** across the codebase
+- **260+ test functions** covering all agent adapters, components, and system detection
 - **78 E2E test functions** running in Docker containers (Ubuntu + Arch)
 - **17 golden files** for snapshot testing component output
 - Full pipeline tested: detection, planning, execution, backup, restore, verification
+- All 5 agent adapters have unit tests with cross-platform path validation
 
 ---
 

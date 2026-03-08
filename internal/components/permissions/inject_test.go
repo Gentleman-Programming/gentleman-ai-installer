@@ -172,7 +172,8 @@ func TestInjectGeminiCLIUsesYoloMode(t *testing.T) {
 func TestInjectVSCodeCopilotUsesAutoApprove(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := Inject(home, vscodeAdapter())
+	adapter := vscodeAdapter()
+	result, err := Inject(home, adapter)
 	if err != nil {
 		t.Fatalf("Inject() error = %v", err)
 	}
@@ -180,7 +181,7 @@ func TestInjectVSCodeCopilotUsesAutoApprove(t *testing.T) {
 		t.Fatal("Inject() changed = false")
 	}
 
-	settingsPath := filepath.Join(home, ".vscode", "settings.json")
+	settingsPath := adapter.SettingsPath(home)
 	content, err := os.ReadFile(settingsPath)
 	if err != nil {
 		t.Fatalf("read settings file: %v", err)

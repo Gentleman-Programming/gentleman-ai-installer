@@ -34,6 +34,35 @@ func TestSystemPromptFileUsesInstructionsExtension(t *testing.T) {
 	}
 }
 
+func TestSettingsPathUsesVSCodeUserProfile(t *testing.T) {
+	a := NewAdapter()
+	home := "/tmp/home"
+
+	switch runtime.GOOS {
+	case "darwin":
+		path := a.SettingsPath(home)
+		want := filepath.Join(home, "Library", "Application Support", "Code", "User", "settings.json")
+		if path != want {
+			t.Fatalf("SettingsPath() = %q, want %q", path, want)
+		}
+	case "windows":
+		appData := filepath.Join(home, "AppData", "Roaming")
+		t.Setenv("APPDATA", appData)
+		path := a.SettingsPath(home)
+		want := filepath.Join(appData, "Code", "User", "settings.json")
+		if path != want {
+			t.Fatalf("SettingsPath() = %q, want %q", path, want)
+		}
+	default:
+		t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg"))
+		path := a.SettingsPath(home)
+		want := filepath.Join(home, "xdg", "Code", "User", "settings.json")
+		if path != want {
+			t.Fatalf("SettingsPath() = %q, want %q", path, want)
+		}
+	}
+}
+
 func TestMCPConfigPathUsesVSCodeUserProfile(t *testing.T) {
 	a := NewAdapter()
 	home := "/tmp/home"

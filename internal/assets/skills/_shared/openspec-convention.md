@@ -11,6 +11,7 @@ openspec/
 └── changes/                 <- Active changes
     ├── archive/             <- Completed changes (YYYY-MM-DD-{change-name}/)
     └── {change-name}/       <- Active change folder
+        ├── state.yaml       <- DAG state (orchestrator, survives compaction)
         ├── exploration.md   <- (optional) from sdd-explore
         ├── proposal.md      <- from sdd-propose
         ├── specs/           <- from sdd-spec
@@ -25,6 +26,7 @@ openspec/
 
 | Skill | Creates / Reads | Path |
 |-------|----------------|------|
+| orchestrator | Creates/Updates | `openspec/changes/{change-name}/state.yaml` (DAG state for compaction recovery) |
 | sdd-init | Creates | `openspec/config.yaml`, `openspec/specs/`, `openspec/changes/`, `openspec/changes/archive/` |
 | sdd-explore | Creates (optional) | `openspec/changes/{change-name}/exploration.md` |
 | sdd-propose | Creates | `openspec/changes/{change-name}/proposal.md` |

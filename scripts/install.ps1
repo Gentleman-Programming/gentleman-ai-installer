@@ -116,12 +116,10 @@ function Get-InstallMethod {
 
     Write-Step "Detecting best install method"
 
-    if (Get-Command "go" -ErrorAction SilentlyContinue) {
-        Write-Success "Go found - will install via go install"
-        return "go"
-    }
-
-    Write-Info "No Go found - will download pre-built binary"
+    # Prefer binary download over go install: GitHub Releases are instant
+    # while the Go module proxy can lag behind new tags for up to 30 minutes,
+    # causing `go install ...@latest` to install a stale version.
+    Write-Info "Will download pre-built binary from GitHub Releases"
     return "binary"
 }
 

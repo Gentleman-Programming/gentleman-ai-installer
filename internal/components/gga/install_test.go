@@ -3,13 +3,55 @@ package gga
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
 
+// resolveGitBashForTest derives the Git Bash path the same way the installcmd
+// package does. This keeps the test independent from installcmd's unexported
+// gitBashPath() while ensuring the expected value matches what the resolver
+// actually produces.
+func resolveGitBashForTest() string {
+	if gitPath, err := exec.LookPath("git"); err == nil {
+		gitDir := filepath.Dir(gitPath)
+		parent := filepath.Dir(gitDir)
+
+		if c := filepath.Join(parent, "bin", "bash.exe"); fileExistsForTest(c) {
+			return c
+		}
+		if c := filepath.Join(gitDir, "bash.exe"); fileExistsForTest(c) {
+			return c
+		}
+	}
+
+	for _, c := range []string{
+		filepath.Join(os.Getenv("ProgramFiles"), "Git", "bin", "bash.exe"),
+		filepath.Join(os.Getenv("ProgramFiles(x86)"), "Git", "bin", "bash.exe"),
+		`C:\Program Files\Git\bin\bash.exe`,
+	} {
+		if c != "" && fileExistsForTest(c) {
+			return c
+		}
+	}
+
+	return "bash"
+}
+
+func fileExistsForTest(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 func TestInstallCommandByProfile(t *testing.T) {
+	cloneDst := filepath.Join(os.TempDir(), "gentleman-guardian-angel")
+	bash := resolveGitBashForTest()
+	scriptPath := strings.ReplaceAll(filepath.Join(cloneDst, "install.sh"), `\`, "/")
+
 	tests := []struct {
 		name    string
 		profile system.PlatformProfile
@@ -40,12 +82,12 @@ func TestInstallCommandByProfile(t *testing.T) {
 			},
 		},
 		{
-			name:    "windows cleans temp dir before cloning",
+			name:    "windows cleans temp dir and uses git bash",
 			profile: system.PlatformProfile{OS: "windows", PackageManager: "winget"},
 			want: [][]string{
-				{"cmd", "/c", fmt.Sprintf(`if exist "%s" rmdir /s /q "%s"`, os.TempDir()+"\\gentleman-guardian-angel", os.TempDir()+"\\gentleman-guardian-angel")},
-				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", os.TempDir() + "\\gentleman-guardian-angel"},
-				{"bash", os.TempDir() + "\\gentleman-guardian-angel\\install.sh"},
+				{"cmd", "/c", fmt.Sprintf(`if exist "%s" rmdir /s /q "%s"`, cloneDst, cloneDst)},
+				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", cloneDst},
+				{bash, scriptPath},
 			},
 		},
 		{

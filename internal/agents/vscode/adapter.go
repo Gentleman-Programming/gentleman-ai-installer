@@ -76,8 +76,7 @@ func (a *Adapter) SkillsDir(homeDir string) string {
 }
 
 func (a *Adapter) SettingsPath(homeDir string) string {
-	// Keep settings path for non-MCP overlays if needed.
-	return filepath.Join(homeDir, ".vscode", "settings.json")
+	return filepath.Join(a.vscodeUserDir(homeDir), "settings.json")
 }
 
 // --- Config strategies ---

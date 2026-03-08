@@ -15,6 +15,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/planner"
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 	"github.com/gentleman-programming/gentle-ai/internal/tui"
+	"github.com/gentleman-programming/gentle-ai/internal/update"
 	"github.com/gentleman-programming/gentle-ai/internal/verify"
 )
 
@@ -52,6 +53,11 @@ func RunArgs(args []string, stdout io.Writer) error {
 	switch args[0] {
 	case "version", "--version", "-v":
 		_, _ = fmt.Fprintf(stdout, "gentle-ai %s\n", Version)
+		return nil
+	case "update":
+		profile := cli.ResolveInstallProfile(result)
+		results := update.CheckAll(context.Background(), Version, profile)
+		_, _ = fmt.Fprint(stdout, update.RenderCLI(results))
 		return nil
 	case "install":
 		installResult, err := cli.RunInstall(args[1:], result)

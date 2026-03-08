@@ -19,12 +19,21 @@ type MissingDep struct {
 	InstallHint string
 }
 
+// UpdateInfo holds version update information for a single tool.
+type UpdateInfo struct {
+	Name             string
+	InstalledVersion string
+	LatestVersion    string
+	UpdateHint       string
+}
+
 type CompletePayload struct {
 	ConfiguredAgents    int
 	InstalledComponents int
 	FailedSteps         []FailedStep
 	RollbackPerformed   bool
 	MissingDeps         []MissingDep
+	AvailableUpdates    []UpdateInfo
 }
 
 func RenderComplete(data CompletePayload) string {
@@ -45,6 +54,7 @@ func renderCompleteSuccess(data CompletePayload) string {
 	b.WriteString("\n")
 
 	renderMissingDeps(&b, data.MissingDeps)
+	renderAvailableUpdates(&b, data.AvailableUpdates)
 
 	b.WriteString(styles.HeadingStyle.Render("Next steps"))
 	b.WriteString("\n")
@@ -69,6 +79,24 @@ func renderMissingDeps(b *strings.Builder, deps []MissingDep) {
 	b.WriteString("\n")
 	for _, dep := range deps {
 		b.WriteString("  " + styles.WarningStyle.Render(dep.Name) + "  " + styles.SubtextStyle.Render(dep.InstallHint))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+}
+
+func renderAvailableUpdates(b *strings.Builder, updates []UpdateInfo) {
+	if len(updates) == 0 {
+		return
+	}
+
+	b.WriteString(styles.HeadingStyle.Render("Available Updates"))
+	b.WriteString("\n")
+	for _, u := range updates {
+		line := fmt.Sprintf("  %s %s -> %s", u.Name, u.InstalledVersion, u.LatestVersion)
+		b.WriteString(styles.WarningStyle.Render(line))
+		if u.UpdateHint != "" {
+			b.WriteString("  " + styles.SubtextStyle.Render(u.UpdateHint))
+		}
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
@@ -103,6 +131,7 @@ func renderCompleteFailed(data CompletePayload) string {
 	}
 
 	renderMissingDeps(&b, data.MissingDeps)
+	renderAvailableUpdates(&b, data.AvailableUpdates)
 
 	b.WriteString(styles.HeadingStyle.Render("What to do"))
 	b.WriteString("\n")
