@@ -78,7 +78,16 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
           
-          git remote add aur ssh://aur@aur.archlinux.org/gentle-ai.git
+          # Clone AUR repo to a separate directory
+          git clone ssh://aur@aur.archlinux.org/gentle-ai.git /tmp/aur
+          cd /tmp/aur
+          
+          # Copy updated files from the fork
+          cp $GITHUB_WORKSPACE/PKGBUILD .
+          cp $GITHUB_WORKSPACE/LICENSE .
+          cp $GITHUB_WORKSPACE/.SRCINFO .
+          
+          # Commit and push
           git add PKGBUILD LICENSE .SRCINFO
           git commit -m "Update to v${{ steps.release.outputs.version }}" || echo "No changes to commit"
-          git push aur main:master
+          git push origin master
