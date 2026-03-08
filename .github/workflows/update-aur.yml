@@ -74,8 +74,8 @@ jobs:
           git config --global user.email "info@gentlemanprogramming.dev"
           
           mkdir -p ~/.ssh
-          echo "$AUR_SSH_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed255
+          echo "$AUR_SSH_KEY" | base64 -d > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
           
           git remote add aur ssh://aur@aur.archlinux.org/gentle-ai.git
