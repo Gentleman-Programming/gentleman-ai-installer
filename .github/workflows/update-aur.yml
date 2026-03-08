@@ -9,11 +9,6 @@ jobs:
   update-aur:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Get release info
         id: release
         run: |
@@ -33,20 +28,42 @@ jobs:
           echo "amd64_hash=$AMD64_HASH" >> $GITHUB_OUTPUT
           echo "arm64_hash=$ARM64_HASH" >> $GITHUB_OUTPUT
 
-      - name: Update PKGBUILD
+      - name: Generate PKGBUILD
         run: |
-          # Update pkgver
-          sed -i "s/^pkgver=.*/pkgver=${{ steps.release.outputs.version }}/" PKGBUILD
+          VERSION="${{ steps.release.outputs.version }}"
+          AMD64_HASH="${{ steps.checksums.outputs.amd64_hash }}"
+          ARM64_HASH="${{ steps.checksums.outputs.arm64_hash }}"
           
-          # Update checksums
-          sed -i "s/sha256sums_x86_64=('.*')/sha256sums_x86_64=('${{ steps.checksums.outputs.amd64_hash }}')/" PKGBUILD
-          sed -i "s/sha256sums_aarch64=('.*')/sha256sums_aarch64=('${{ steps.checksums.outputs.arm64_hash }}')/" PKGBUILD
+          cat > /tmp/PKGBUILD << PKGEOF
+          # Maintainer: Gentleman Programming <info@gentlemanprogramming.dev>
+          # Contributor: Gabriel Fagundez <gabrielfagundeznievas@gmail.com>
           
-          cat PKGBUILD
+          pkgname=gentle-ai
+          pkgver=$VERSION
+          pkgrel=1
+          pkgdesc="AI Gentle Stack - Ecosystem configurator for AI coding agents"
+          arch=('x86_64' 'aarch64')
+          url="https://github.com/Gentleman-Programming/gentle-ai"
+          license=('MIT')
+          provides=('gentle-ai')
+          conflicts=('gentle-ai')
+          
+          source_x86_64=("gentle-ai_${VERSION}_linux_amd64.tar.gz::https://github.com/Gentleman-Programming/gentle-ai/releases/download/v${VERSION}/gentle-ai_${VERSION}_linux_amd64.tar.gz")
+          source_aarch64=("gentle-ai_${VERSION}_linux_arm64.tar.gz::https://github.com/Gentleman-Programming/gentle-ai/releases/download/v${VERSION}/gentle-ai_${VERSION}_linux_arm64.tar.gz")
+          
+          sha256sums_x86_64=('$AMD64_HASH')
+          sha256sums_aarch64=('$ARM64_HASH')
+          
+          package() {
+            install -Dm755 gentle-ai "\${pkgdir}/usr/bin/gentle-ai"
+            install -Dm644 LICENSE "\${pkgdir}/usr/share/licenses/gentle-ai/LICENSE"
+          }
+          PKGEOF
+          cat /tmp/PKGBUILD
 
-      - name: Update .SRCINFO
+      - name: Generate .SRCINFO
         run: |
-          cat > .SRCINFO << EOF
+          cat > /tmp/.SRCINFO << EOF
           pkgbase = gentle-ai
               pkgdesc = AI Gentle Stack - Ecosystem configurator for AI coding agents
               pkgver = ${{ steps.release.outputs.version }}
@@ -61,10 +78,37 @@ jobs:
               sha256sums_x86_64 = ${{ steps.checksums.outputs.amd64_hash }}
               source_aarch64 = gentle-ai_${{ steps.release.outputs.version }}_linux_arm64.tar.gz::https://github.com/Gentleman-Programming/gentle-ai/releases/download/v${{ steps.release.outputs.version }}/gentle-ai_${{ steps.release.outputs.version }}_linux_arm64.tar.gz
               sha256sums_aarch64 = ${{ steps.checksums.outputs.arm64_hash }}
-
+          
           pkgname = gentle-ai
           EOF
-          cat .SRCINFO
+          cat /tmp/.SRCINFO
+
+      - name: Generate LICENSE
+        run: |
+          cat > /tmp/LICENSE << 'LICENSEEOF'
+          MIT License
+          
+          Copyright (c) 2024 Gentleman Programming
+          
+          Permission is hereby granted, free of charge, to any person obtaining a copy
+          of this software and associated documentation files (the "Software"), to deal
+          in the Software without restriction, including without limitation the rights
+          to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+          copies of the Software, and to permit persons to whom the Software is
+          furnished to do so, subject to the following conditions:
+          
+          The above copyright notice and this permission notice shall be included in all
+          copies or substantial portions of the Software.
+          
+          THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+          IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+          FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+          AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+          LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+          OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+          SOFTWARE.
+          LICENSEEOF
+          cat /tmp/LICENSE
 
       - name: Commit and push to AUR
         env:
@@ -78,14 +122,14 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
           
-          # Clone AUR repo to a separate directory
+          # Clone AUR repo
           git clone ssh://aur@aur.archlinux.org/gentle-ai.git /tmp/aur
           cd /tmp/aur
           
-          # Copy updated files from the fork
-          cp $GITHUB_WORKSPACE/PKGBUILD .
-          cp $GITHUB_WORKSPACE/LICENSE .
-          cp $GITHUB_WORKSPACE/.SRCINFO .
+          # Copy generated files
+          cp /tmp/PKGBUILD .
+          cp /tmp/LICENSE .
+          cp /tmp/.SRCINFO .
           
           # Commit and push
           git add PKGBUILD LICENSE .SRCINFO
