@@ -85,7 +85,7 @@ func TestInstallCommandByProfile(t *testing.T) {
 			name:    "windows cleans temp dir and uses git bash",
 			profile: system.PlatformProfile{OS: "windows", PackageManager: "winget"},
 			want: [][]string{
-				{"cmd", "/c", fmt.Sprintf(`if exist "%s" rmdir /s /q "%s"`, cloneDst, cloneDst)},
+				{"powershell", "-NoProfile", "-Command", fmt.Sprintf("Remove-Item -Recurse -Force -ErrorAction SilentlyContinue '%s'; exit 0", cloneDst)},
 				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", cloneDst},
 				{bash, scriptPath},
 			},
