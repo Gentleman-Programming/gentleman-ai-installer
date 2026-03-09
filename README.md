@@ -43,6 +43,7 @@
 - [Supported Agents](#supported-agents)
 - [Components](#components)
 - [Skills](#skills)
+- [Skill Discovery](#skill-discovery)
 - [Presets](#presets)
 - [Persona Modes](#persona-modes)
 - [Usage](#usage)
@@ -69,6 +70,8 @@ This is NOT an AI agent installer. Most agents are easy to install. This is an *
 **Before**: "I installed Claude Code / OpenCode / Cursor, but it's just a chatbot that writes code."
 
 **After**: Your agent now has memory, skills, workflow, MCP tools, and a persona that actually teaches you.
+
+After setup, use **Skill Discovery** from the TUI menu to find and install additional [skills.sh](https://skills.sh) skills relevant to your project stack — automatically detected, filtered by trusted publishers, and installed with one keypress.
 
 ---
 
@@ -185,6 +188,47 @@ All agents receive the **full SDD orchestrator** (agent-teams-lite) injected int
 | Skill Creator | `skill-creator` | Create new AI agent skills following the Agent Skills spec |
 
 These foundation skills are installed by default with both `full-gentleman` and `ecosystem-only` presets.
+
+---
+
+## Skill Discovery
+
+After the initial setup, the **Discover Skills** option in the TUI menu lets you browse and install additional skills from [skills.sh](https://skills.sh) tailored to your project's tech stack.
+
+### How it works
+
+1. **Stack detection** — reads your project's config files (`package.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`, `requirements.txt`, `composer.json`) to identify the tech stack.
+2. **Auto-recommendations** — searches skills.sh per keyword and shows up to 5 relevant skills sorted by popularity.
+3. **Manual search** — after browsing the recommendations, search for any additional skill by name.
+4. **Install** — selected skills are installed via `npx skills add` with a 60-second timeout per skill.
+
+### Key bindings
+
+| Screen | Key | Action |
+|--------|-----|--------|
+| Loading | `ESC` | Cancel and return to menu |
+| Browsing | `↑` | Add current skill to install list |
+| Browsing | `→` | Skip to next skill |
+| Browsing | `ESC` | Finish browsing, go to search |
+| Search | type | Build search query |
+| Search | `↵` | Run search |
+| Search | `ESC` | Install all selected skills now |
+| Results | `↑` / `↓` | Navigate results |
+| Results | `↵` | Add highlighted skill |
+| Results | `ESC` | Back to search without adding |
+
+### Security
+
+Skills are filtered before being shown:
+- **Trusted publishers only** — allowlist of 23 verified sources (Vercel Labs, Anthropic, Google Labs, Microsoft, GitHub, Supabase, Expo, Antfu, and others).
+- **Minimum 500 installs** — filters out low-adoption skills.
+- **Valid skill ID** — rejects skills with malformed IDs that would break installation.
+
+Attempting to add the same skill twice shows a warning instead of duplicating it.
+
+### Requirements
+
+Node.js (for `npx`) must be installed. The screen exits gracefully with an error message if `npx` is not found.
 
 ---
 
