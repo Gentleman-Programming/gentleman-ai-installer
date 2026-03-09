@@ -242,11 +242,63 @@ func TestInstallCommandsForDepBrewOnWindowsReturnsNil(t *testing.T) {
 	}
 }
 
+func TestInstallHintGitFedora(t *testing.T) {
+	profile := PlatformProfile{OS: "linux", PackageManager: "dnf", LinuxDistro: "fedora"}
+	hint := installHintGit(profile)
+	if hint != "sudo dnf install -y git" {
+		t.Fatalf("installHintGit(fedora) = %q", hint)
+	}
+}
+
+func TestInstallHintCurlFedora(t *testing.T) {
+	profile := PlatformProfile{OS: "linux", PackageManager: "dnf", LinuxDistro: "fedora"}
+	hint := installHintCurl(profile)
+	if hint != "sudo dnf install -y curl" {
+		t.Fatalf("installHintCurl(fedora) = %q", hint)
+	}
+}
+
+func TestInstallHintNodeFedora(t *testing.T) {
+	profile := PlatformProfile{OS: "linux", PackageManager: "dnf", LinuxDistro: "fedora"}
+	hint := installHintNode(profile)
+	if !strings.Contains(hint, "nodesource") {
+		t.Fatalf("installHintNode(fedora) = %q, want NodeSource URL", hint)
+	}
+}
+
+func TestInstallHintGoFedora(t *testing.T) {
+	profile := PlatformProfile{OS: "linux", PackageManager: "dnf", LinuxDistro: "fedora"}
+	hint := installHintGo(profile)
+	if hint != "sudo dnf install -y golang" {
+		t.Fatalf("installHintGo(fedora) = %q", hint)
+	}
+}
+
+func TestInstallCommandsForDepGitFedoraUsesDnf(t *testing.T) {
+	profile := PlatformProfile{OS: "linux", PackageManager: "dnf", LinuxDistro: "fedora"}
+	cmds := InstallCommandsForDep("git", profile)
+	if len(cmds) != 1 {
+		t.Fatalf("git fedora commands = %d, want 1", len(cmds))
+	}
+	if cmds[0][0] != "sudo" || cmds[0][1] != "dnf" {
+		t.Fatalf("git fedora command = %v, want sudo dnf", cmds[0])
+	}
+}
+
+func TestInstallCommandsForDepNodeFedoraHasTwoSteps(t *testing.T) {
+	profile := PlatformProfile{OS: "linux", PackageManager: "dnf", LinuxDistro: "fedora"}
+	cmds := InstallCommandsForDep("node", profile)
+	if len(cmds) != 2 {
+		t.Fatalf("node fedora commands = %d, want 2 (nodesource setup + install)", len(cmds))
+	}
+}
+
 func TestInstallCommandsFullMatrix(t *testing.T) {
 	profiles := []PlatformProfile{
 		{OS: "darwin", PackageManager: "brew"},
 		{OS: "linux", PackageManager: "apt", LinuxDistro: "ubuntu"},
 		{OS: "linux", PackageManager: "pacman", LinuxDistro: "arch"},
+		{OS: "linux", PackageManager: "dnf", LinuxDistro: "fedora"},
 	}
 
 	deps := []string{"git", "curl", "node", "go"}

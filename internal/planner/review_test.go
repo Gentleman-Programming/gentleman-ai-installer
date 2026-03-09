@@ -68,12 +68,21 @@ func TestPlatformDecisionFromProfileMatrix(t *testing.T) {
 			},
 		},
 		{
-			name: "unsupported distro propagates unsupported status",
+			name: "fedora profile propagates dnf and supported",
 			profile: system.PlatformProfile{
-				OS: "linux", LinuxDistro: "fedora", Supported: false,
+				OS: "linux", LinuxDistro: system.LinuxDistroFedora, PackageManager: "dnf", Supported: true,
 			},
 			want: PlatformDecision{
-				OS: "linux", LinuxDistro: "fedora", Supported: false,
+				OS: "linux", LinuxDistro: system.LinuxDistroFedora, PackageManager: "dnf", Supported: true,
+			},
+		},
+		{
+			name: "unsupported distro propagates unsupported status",
+			profile: system.PlatformProfile{
+				OS: "linux", LinuxDistro: "gentoo", Supported: false,
+			},
+			want: PlatformDecision{
+				OS: "linux", LinuxDistro: "gentoo", Supported: false,
 			},
 		},
 	}

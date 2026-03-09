@@ -41,7 +41,7 @@ func TestEnsureSupportedPlatformAllowsSupportedLinux(t *testing.T) {
 }
 
 func TestEnsureSupportedPlatformRejectsUnsupportedLinuxDistro(t *testing.T) {
-	err := EnsureSupportedPlatform(PlatformProfile{OS: "linux", LinuxDistro: "fedora", Supported: false})
+	err := EnsureSupportedPlatform(PlatformProfile{OS: "linux", LinuxDistro: "gentoo", Supported: false})
 	if err == nil {
 		t.Fatalf("expected error for unsupported linux distro")
 	}
@@ -50,7 +50,14 @@ func TestEnsureSupportedPlatformRejectsUnsupportedLinuxDistro(t *testing.T) {
 		t.Fatalf("expected ErrUnsupportedLinuxDistro, got %v", err)
 	}
 
-	if !strings.Contains(err.Error(), "Linux support is limited to Ubuntu/Debian and Arch") {
+	if !strings.Contains(err.Error(), "Linux support is limited to Ubuntu/Debian, Arch, and Fedora/RHEL") {
 		t.Fatalf("expected distro guard message, got %q", err.Error())
+	}
+}
+
+func TestEnsureSupportedPlatformAllowsFedora(t *testing.T) {
+	err := EnsureSupportedPlatform(PlatformProfile{OS: "linux", LinuxDistro: LinuxDistroFedora, Supported: true})
+	if err != nil {
+		t.Fatalf("expected fedora profile to be supported, got %v", err)
 	}
 }
