@@ -901,6 +901,70 @@ func TestRunInstallGGASkipsInstallWhenAlreadyOnPath(t *testing.T) {
 			t.Fatalf("expected gga install to be skipped, but got command: %s", cmd)
 		}
 	}
+
+	prModePath := filepath.Join(home, ".local", "share", "gga", "lib", "pr_mode.sh")
+	content, err := os.ReadFile(prModePath)
+	if err != nil {
+		t.Fatalf("expected gga runtime asset at %q: %v", prModePath, err)
+	}
+	if !strings.Contains(string(content), "detect_base_branch") {
+		t.Fatalf("expected pr_mode.sh to contain detect_base_branch")
+	}
+}
+
+func TestRunInstallGGALinuxIncludesTempCleanupBeforeClone(t *testing.T) {
+	home := t.TempDir()
+	restoreHome := osUserHomeDir
+	restoreCommand := runCommand
+	restoreLookPath := cmdLookPath
+	t.Cleanup(func() {
+		osUserHomeDir = restoreHome
+		runCommand = restoreCommand
+		cmdLookPath = restoreLookPath
+	})
+
+	osUserHomeDir = func() (string, error) { return home, nil }
+	cmdLookPath = func(name string) (string, error) {
+		if name == "gga" {
+			return "", exec.ErrNotFound
+		}
+		return "/usr/local/bin/" + name, nil
+	}
+	recorder := &commandRecorder{}
+	runCommand = recorder.record
+
+	result, err := RunInstall(
+		[]string{"--agent", "opencode", "--component", "gga"},
+		linuxDetectionResult(system.LinuxDistroUbuntu, "apt"),
+	)
+	if err != nil {
+		t.Fatalf("RunInstall() error = %v", err)
+	}
+	if !result.Verify.Ready {
+		t.Fatalf("verification ready = false")
+	}
+
+	commands := recorder.get()
+	cleanupIdx := -1
+	cloneIdx := -1
+	for i, cmd := range commands {
+		if strings.Contains(cmd, "rm -rf /tmp/gentleman-guardian-angel") {
+			cleanupIdx = i
+		}
+		if strings.Contains(cmd, "git clone https://github.com/Gentleman-Programming/gentleman-guardian-angel.git /tmp/gentleman-guardian-angel") {
+			cloneIdx = i
+		}
+	}
+
+	if cleanupIdx == -1 {
+		t.Fatalf("expected cleanup command before clone, got commands: %v", commands)
+	}
+	if cloneIdx == -1 {
+		t.Fatalf("expected clone command, got commands: %v", commands)
+	}
+	if cleanupIdx >= cloneIdx {
+		t.Fatalf("cleanup should run before clone (cleanup=%d clone=%d)", cleanupIdx, cloneIdx)
+	}
 }
 
 func TestRunInstallEngramAutoInstallsGoWhenMissing(t *testing.T) {

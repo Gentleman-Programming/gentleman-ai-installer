@@ -414,6 +414,9 @@ func (s componentApplyStep) Run() error {
 				return err
 			}
 		}
+		if err := gga.EnsureRuntimeAssets(s.homeDir); err != nil {
+			return fmt.Errorf("ensure gga runtime assets: %w", err)
+		}
 		if _, err := gga.Inject(s.homeDir, s.agents); err != nil {
 			return fmt.Errorf("inject gga config: %w", err)
 		}
@@ -704,7 +707,10 @@ func engramHealthChecks() []verify.Check {
 			Description: "engram binary on PATH (restart shell if missing)",
 			Soft:        true,
 			Run: func(context.Context) error {
-				return engram.VerifyInstalled()
+				if err := engram.VerifyInstalled(); err != nil {
+					return fmt.Errorf("%w\n%s", err, engramPathGuidance(os.Getenv("SHELL")))
+				}
+				return nil
 			},
 		},
 		{
@@ -721,6 +727,19 @@ func engramHealthChecks() []verify.Check {
 			},
 		},
 	}
+}
+
+func engramPathGuidance(shellPath string) string {
+	if strings.Contains(shellPath, "fish") {
+		return "If engram is installed but not on PATH, run: set -Ux fish_user_paths $HOME/go/bin $fish_user_paths"
+	}
+	if strings.Contains(shellPath, "zsh") {
+		return "If engram is installed but not on PATH, run: echo 'export PATH=\"$HOME/go/bin:$PATH\"' >> ~/.zshrc && source ~/.zshrc"
+	}
+	if strings.Contains(shellPath, "bash") {
+		return "If engram is installed but not on PATH, run: echo 'export PATH=\"$HOME/go/bin:$PATH\"' >> ~/.bashrc && source ~/.bashrc"
+	}
+	return "If engram is installed but not on PATH, add $HOME/go/bin to your shell PATH and restart the terminal"
 }
 
 // checkDependenciesStep verifies that required system dependencies are present.

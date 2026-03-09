@@ -552,12 +552,18 @@ test_oc_engram_injection() {
 
     if $BINARY install --agent opencode --component engram --persona neutral 2>&1; then
         local settings="$HOME/.config/opencode/opencode.json"
+        local agents_md="$HOME/.config/opencode/AGENTS.md"
         assert_file_exists "$settings" "OpenCode opencode.json"
         assert_file_contains "$settings" '"mcp"' "Has mcp key"
         assert_file_contains "$settings" '"engram"' "Has engram MCP entry"
         assert_file_contains "$settings" '"command"' "Has command key"
         assert_file_contains "$settings" '"type": "local"' "Engram uses local MCP type"
         assert_valid_json "$settings" "opencode.json is valid JSON"
+
+        # Fallback safety: AGENTS.md must include engram protocol section.
+        assert_file_exists "$agents_md" "OpenCode AGENTS.md"
+        assert_file_contains "$agents_md" 'gentle-ai:engram-protocol' "AGENTS.md has engram-protocol section"
+        assert_file_contains "$agents_md" 'mem_save' "AGENTS.md has memory protocol content"
     else
         log_fail "OpenCode engram install command failed"
     fi
@@ -1182,6 +1188,34 @@ test_gga_config() {
     fi
 }
 
+test_gga_runtime_pr_mode_installed() {
+    log_test "GGA runtime includes pr_mode.sh"
+    cleanup_test_env
+
+    if $BINARY install --agent claude-code --component gga --persona neutral 2>&1; then
+        local pr_mode="$HOME/.local/share/gga/lib/pr_mode.sh"
+        assert_file_exists "$pr_mode" "GGA pr_mode.sh exists"
+        assert_file_contains "$pr_mode" 'detect_base_branch' "pr_mode.sh has PR mode functions"
+    else
+        log_skip "GGA install failed (expected — binary install may require network)"
+    fi
+}
+
+test_gga_reinstall_is_idempotent() {
+    log_test "GGA install is idempotent on second run"
+    cleanup_test_env
+
+    if $BINARY install --agent claude-code --component gga --persona neutral 2>&1; then
+        if $BINARY install --agent claude-code --component gga --persona neutral 2>&1; then
+            log_pass "Second GGA install completed successfully"
+        else
+            log_fail "Second GGA install failed"
+        fi
+    else
+        log_skip "GGA first install failed (expected — binary install may require network)"
+    fi
+}
+
 # --- Category 7: Injection integrity (guards against issue #4 regression) ---
 
 test_integrity_sdd_skills_nonempty() {
@@ -1573,6 +1607,8 @@ if [ "${RUN_FULL_E2E:-0}" = "1" ]; then
 
     # GGA
     test_gga_config
+    test_gga_runtime_pr_mode_installed
+    test_gga_reinstall_is_idempotent
 
     # Category 7: Injection integrity (issue #4 regression guard)
     test_integrity_sdd_skills_nonempty
