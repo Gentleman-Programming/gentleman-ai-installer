@@ -181,6 +181,7 @@ func TestResolvePlatformProfileMatrix(t *testing.T) {
 		name          string
 		goos          string
 		osRelease     string
+		tools         map[string]ToolStatus
 		wantOS        string
 		wantPM        string
 		wantDistro    string
@@ -191,6 +192,16 @@ func TestResolvePlatformProfileMatrix(t *testing.T) {
 			goos:          "darwin",
 			wantOS:        "darwin",
 			wantPM:        "brew",
+			wantSupported: true,
+		},
+		{
+			name:          "linux with brew",
+			goos:          "linux",
+			osRelease:     "ID=debian\n",
+			tools:         map[string]ToolStatus{"brew": {Name: "brew", Installed: true}},
+			wantOS:        "linux",
+			wantPM:        "brew",
+			wantDistro:    LinuxDistroDebian,
 			wantSupported: true,
 		},
 		{
@@ -249,7 +260,7 @@ func TestResolvePlatformProfileMatrix(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			profile := resolvePlatformProfile(tc.goos, tc.osRelease)
+			profile := resolvePlatformProfile(tc.goos, tc.osRelease, tc.tools)
 			if profile.OS != tc.wantOS {
 				t.Fatalf("OS = %q, want %q", profile.OS, tc.wantOS)
 			}

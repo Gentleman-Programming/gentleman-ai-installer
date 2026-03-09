@@ -193,7 +193,7 @@ func (r *installRuntime) stagePlan() pipeline.StagePlan {
 	apply = append(apply, rollbackRestoreStep{id: "apply:rollback-restore", state: r.state})
 
 	for _, agent := range r.resolved.Agents {
-		apply = append(apply, agentInstallStep{id: "agent:" + string(agent), agent: agent, profile: r.profile})
+		apply = append(apply, agentInstallStep{id: "agent:" + string(agent), agent: agent, homeDir: r.homeDir, profile: r.profile})
 	}
 
 	for _, component := range r.resolved.OrderedComponents {
@@ -256,6 +256,7 @@ func (s rollbackRestoreStep) Rollback() error {
 type agentInstallStep struct {
 	id      string
 	agent   model.AgentID
+	homeDir string
 	profile system.PlatformProfile
 }
 
@@ -270,6 +271,14 @@ func (s agentInstallStep) Run() error {
 	}
 
 	if !adapter.SupportsAutoInstall() {
+		return nil
+	}
+
+	installed, _, _, _, err := adapter.Detect(context.Background(), s.homeDir)
+	if err != nil {
+		return fmt.Errorf("detect agent %q: %w", s.agent, err)
+	}
+	if installed {
 		return nil
 	}
 

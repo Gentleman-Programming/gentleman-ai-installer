@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
 
@@ -373,6 +374,13 @@ func TestRunInstallLinuxAgentInstallResolvesGoInstallCommand(t *testing.T) {
 	cmdLookPath = missingBinaryLookPath
 	recorder := &commandRecorder{}
 	runCommand = recorder.record
+
+	// Set the agent adapter's lookPath to simulate missing opencode
+	opencodeAdapterLookPath := opencode.LookPathOverride
+	opencode.LookPathOverride = missingBinaryLookPath
+	t.Cleanup(func() {
+		opencode.LookPathOverride = opencodeAdapterLookPath
+	})
 
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
 	_, err := RunInstall(

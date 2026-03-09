@@ -84,7 +84,7 @@ func detectFromInputs(goos, arch, shell, linuxOSRelease string, tools map[string
 		}
 	}
 
-	profile := resolvePlatformProfile(goos, linuxOSRelease)
+	profile := resolvePlatformProfile(goos, linuxOSRelease, tools)
 
 	return DetectionResult{
 		System: SystemInfo{
@@ -112,7 +112,7 @@ func osReleaseContent(goos string) (string, error) {
 	return string(data), nil
 }
 
-func resolvePlatformProfile(goos, linuxOSRelease string) PlatformProfile {
+func resolvePlatformProfile(goos, linuxOSRelease string, tools map[string]ToolStatus) PlatformProfile {
 	profile := PlatformProfile{OS: goos}
 
 	switch goos {
@@ -123,6 +123,13 @@ func resolvePlatformProfile(goos, linuxOSRelease string) PlatformProfile {
 	case "linux":
 		distro := detectLinuxDistro(linuxOSRelease)
 		profile.LinuxDistro = distro
+
+		// Check if brew is available on Linux
+		if brew, ok := tools["brew"]; ok && brew.Installed {
+			profile.PackageManager = "brew"
+			profile.Supported = true
+			return profile
+		}
 
 		switch distro {
 		case LinuxDistroUbuntu, LinuxDistroDebian:
