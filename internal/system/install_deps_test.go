@@ -172,6 +172,76 @@ func TestFormatMissingDepsMessageWithMissing(t *testing.T) {
 	}
 }
 
+func TestInstallHintGitWindows(t *testing.T) {
+	profile := PlatformProfile{OS: "windows", PackageManager: "winget"}
+	hint := installHintGit(profile)
+	if hint != "winget install Git.Git" {
+		t.Fatalf("installHintGit(windows) = %q", hint)
+	}
+}
+
+func TestInstallHintNodeWindows(t *testing.T) {
+	profile := PlatformProfile{OS: "windows", PackageManager: "winget"}
+	hint := installHintNode(profile)
+	if hint != "winget install OpenJS.NodeJS.LTS" {
+		t.Fatalf("installHintNode(windows) = %q", hint)
+	}
+}
+
+func TestInstallHintGoWindows(t *testing.T) {
+	profile := PlatformProfile{OS: "windows", PackageManager: "winget"}
+	hint := installHintGo(profile)
+	if hint != "winget install GoLang.Go" {
+		t.Fatalf("installHintGo(windows) = %q", hint)
+	}
+}
+
+func TestInstallHintCurlWindows(t *testing.T) {
+	profile := PlatformProfile{OS: "windows", PackageManager: "winget"}
+	hint := installHintCurl(profile)
+	if !strings.Contains(hint, "pre-installed") {
+		t.Fatalf("installHintCurl(windows) = %q, want pre-installed message", hint)
+	}
+}
+
+func TestInstallCommandsForDepGitWindows(t *testing.T) {
+	profile := PlatformProfile{OS: "windows", PackageManager: "winget"}
+	cmds := InstallCommandsForDep("git", profile)
+	if len(cmds) != 1 {
+		t.Fatalf("git windows commands = %d, want 1", len(cmds))
+	}
+	if cmds[0][0] != "winget" {
+		t.Fatalf("git windows command = %v, want winget", cmds[0])
+	}
+}
+
+func TestInstallCommandsForDepNodeWindows(t *testing.T) {
+	profile := PlatformProfile{OS: "windows", PackageManager: "winget"}
+	cmds := InstallCommandsForDep("node", profile)
+	if len(cmds) != 1 {
+		t.Fatalf("node windows commands = %d, want 1", len(cmds))
+	}
+	if cmds[0][0] != "winget" {
+		t.Fatalf("node windows command = %v, want winget", cmds[0])
+	}
+}
+
+func TestInstallCommandsForDepCurlWindowsReturnsNil(t *testing.T) {
+	profile := PlatformProfile{OS: "windows", PackageManager: "winget"}
+	cmds := InstallCommandsForDep("curl", profile)
+	if cmds != nil {
+		t.Fatalf("curl on windows = %v, want nil (pre-installed)", cmds)
+	}
+}
+
+func TestInstallCommandsForDepBrewOnWindowsReturnsNil(t *testing.T) {
+	profile := PlatformProfile{OS: "windows", PackageManager: "winget"}
+	cmds := InstallCommandsForDep("brew", profile)
+	if cmds != nil {
+		t.Fatalf("brew on windows = %v, want nil", cmds)
+	}
+}
+
 func TestInstallCommandsFullMatrix(t *testing.T) {
 	profiles := []PlatformProfile{
 		{OS: "darwin", PackageManager: "brew"},

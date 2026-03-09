@@ -160,15 +160,18 @@ detect_install_method() {
 
     step "Detecting best install method"
 
+    # Priority: brew > binary > go
+    # Brew handles upgrades natively and is instant.
+    # Binary download from GitHub Releases is always up-to-date.
+    # go install is last resort because the Go module proxy can lag
+    # behind new tags for up to 30 minutes, causing @latest to install
+    # a stale version.
     if command -v brew &>/dev/null; then
         INSTALL_METHOD="brew"
         success "Homebrew found — will install via brew tap"
-    elif command -v go &>/dev/null; then
-        INSTALL_METHOD="go"
-        success "Go found — will install via go install"
     else
         INSTALL_METHOD="binary"
-        info "No brew or go found — will download pre-built binary"
+        info "Will download pre-built binary from GitHub Releases"
     fi
 }
 

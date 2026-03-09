@@ -10,7 +10,7 @@ func TestIsSupportedOS(t *testing.T) {
 	}{
 		{name: "darwin is supported", goos: "darwin", want: true},
 		{name: "linux is supported", goos: "linux", want: true},
-		{name: "windows is unsupported", goos: "windows", want: false},
+		{name: "windows is supported", goos: "windows", want: true},
 	}
 
 	for _, tc := range tests {
@@ -230,11 +230,11 @@ func TestResolvePlatformProfileMatrix(t *testing.T) {
 			wantSupported: false,
 		},
 		{
-			name:          "windows is unsupported",
+			name:          "windows profile",
 			goos:          "windows",
 			wantOS:        "windows",
-			wantPM:        "",
-			wantSupported: false,
+			wantPM:        "winget",
+			wantSupported: true,
 		},
 		{
 			name:          "linux without os-release is unsupported",
@@ -270,6 +270,29 @@ func TestDetectFromInputsShellDefaultsToUnknown(t *testing.T) {
 	result := detectFromInputs("darwin", "arm64", "", "", nil, nil)
 	if result.System.Shell != "unknown" {
 		t.Fatalf("Shell = %q, want %q", result.System.Shell, "unknown")
+	}
+}
+
+func TestDetectFromInputsWindowsShellDefaultsToPowershell(t *testing.T) {
+	result := detectFromInputs("windows", "amd64", "", "", nil, nil)
+	if result.System.Shell != "powershell" {
+		t.Fatalf("Shell = %q, want %q", result.System.Shell, "powershell")
+	}
+}
+
+func TestDetectFromInputsMarksWindowsSupported(t *testing.T) {
+	result := detectFromInputs("windows", "amd64", "", "", nil, nil)
+
+	if !result.System.Supported {
+		t.Fatalf("expected supported system for windows")
+	}
+
+	if result.System.OS != "windows" {
+		t.Fatalf("expected OS windows, got %q", result.System.OS)
+	}
+
+	if result.System.Profile.PackageManager != "winget" {
+		t.Fatalf("expected winget package manager for Windows, got %q", result.System.Profile.PackageManager)
 	}
 }
 

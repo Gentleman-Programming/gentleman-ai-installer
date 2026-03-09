@@ -1,4 +1,4 @@
-package opencode
+package gemini
 
 import (
 	"context"
@@ -25,11 +25,11 @@ func TestDetect(t *testing.T) {
 	}{
 		{
 			name:            "binary and config directory found",
-			lookPathPath:    "/opt/homebrew/bin/opencode",
+			lookPathPath:    "/usr/local/bin/gemini",
 			stat:            statResult{isDir: true},
 			wantInstalled:   true,
-			wantBinaryPath:  "/opt/homebrew/bin/opencode",
-			wantConfigPath:  filepath.Join("/tmp/home", ".config", "opencode"),
+			wantBinaryPath:  "/usr/local/bin/gemini",
+			wantConfigPath:  filepath.Join("/tmp/home", ".gemini"),
 			wantConfigFound: true,
 		},
 		{
@@ -38,7 +38,7 @@ func TestDetect(t *testing.T) {
 			stat:            statResult{err: os.ErrNotExist},
 			wantInstalled:   false,
 			wantBinaryPath:  "",
-			wantConfigPath:  filepath.Join("/tmp/home", ".config", "opencode"),
+			wantConfigPath:  filepath.Join("/tmp/home", ".gemini"),
 			wantConfigFound: false,
 		},
 		{
@@ -94,44 +94,60 @@ func TestInstallCommand(t *testing.T) {
 		name    string
 		profile system.PlatformProfile
 		want    [][]string
-		wantErr bool
 	}{
 		{
-			name:    "darwin resolves official anomalyco brew tap",
+			name:    "darwin uses npm without sudo",
 			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
-			want:    [][]string{{"brew", "install", "anomalyco/tap/opencode"}},
+			want:    [][]string{{"npm", "install", "-g", "@google/gemini-cli"}},
 		},
 		{
-			name:    "ubuntu resolves npm install",
+			name:    "linux system npm uses sudo",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
-			want:    [][]string{{"sudo", "npm", "install", "-g", "opencode-ai"}},
+			want:    [][]string{{"sudo", "npm", "install", "-g", "@google/gemini-cli"}},
 		},
 		{
-			name:    "arch resolves npm install",
-			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
-			want:    [][]string{{"sudo", "npm", "install", "-g", "opencode-ai"}},
+			name:    "linux nvm skips sudo",
+			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt", NpmWritable: true},
+			want:    [][]string{{"npm", "install", "-g", "@google/gemini-cli"}},
 		},
 		{
-			name:    "unsupported package manager errors",
-			profile: system.PlatformProfile{OS: "linux", LinuxDistro: "fedora", PackageManager: "dnf"},
-			wantErr: true,
+			name:    "windows uses npm without sudo",
+			profile: system.PlatformProfile{OS: "windows", PackageManager: "winget", NpmWritable: true},
+			want:    [][]string{{"npm", "install", "-g", "@google/gemini-cli"}},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			command, err := a.InstallCommand(tt.profile)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("InstallCommand() error = %v, wantErr %v", err, tt.wantErr)
-			}
-
-			if tt.wantErr {
-				return
+			if err != nil {
+				t.Fatalf("InstallCommand() returned error: %v", err)
 			}
 
 			if !reflect.DeepEqual(command, tt.want) {
 				t.Fatalf("InstallCommand() = %v, want %v", command, tt.want)
 			}
 		})
+	}
+}
+
+func TestConfigPathsCrossPlatform(t *testing.T) {
+	a := NewAdapter()
+	home := "/tmp/home"
+
+	if got := a.GlobalConfigDir(home); got != filepath.Join(home, ".gemini") {
+		t.Fatalf("GlobalConfigDir() = %q, want %q", got, filepath.Join(home, ".gemini"))
+	}
+
+	if got := a.SkillsDir(home); got != filepath.Join(home, ".gemini", "skills") {
+		t.Fatalf("SkillsDir() = %q, want %q", got, filepath.Join(home, ".gemini", "skills"))
+	}
+
+	if got := a.MCPConfigPath(home, "ctx7"); got != filepath.Join(home, ".gemini", "settings.json") {
+		t.Fatalf("MCPConfigPath() = %q, want %q", got, filepath.Join(home, ".gemini", "settings.json"))
+	}
+
+	if got := a.SystemPromptFile(home); got != filepath.Join(home, ".gemini", "GEMINI.md") {
+		t.Fatalf("SystemPromptFile() = %q, want %q", got, filepath.Join(home, ".gemini", "GEMINI.md"))
 	}
 }

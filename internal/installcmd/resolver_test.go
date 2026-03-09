@@ -1,6 +1,9 @@
 package installcmd
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -37,6 +40,12 @@ func TestResolveDependencyInstall(t *testing.T) {
 			want:    CommandSequence{{"sudo", "pacman", "-S", "--noconfirm", "somepkg"}},
 		},
 		{
+			name:    "windows resolves winget command",
+			profile: system.PlatformProfile{OS: "windows", PackageManager: "winget"},
+			dep:     "somepkg",
+			want:    CommandSequence{{"winget", "install", "--id", "somepkg", "-e", "--accept-source-agreements", "--accept-package-agreements"}},
+		},
+		{
 			name:    "unsupported package manager returns error",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: "fedora", PackageManager: "dnf"},
 			dep:     "somepkg",
@@ -65,6 +74,67 @@ func TestResolveDependencyInstall(t *testing.T) {
 				t.Fatalf("ResolveDependencyInstall() = %v, want %v", command, tt.want)
 			}
 		})
+	}
+}
+
+func TestGitBashPathResolvesFromGitOnPath(t *testing.T) {
+	// Create a fake directory structure mimicking Git for Windows layout:
+	// tmpdir/cmd/git.exe  (git binary)
+	// tmpdir/bin/bash.exe (git bash)
+	tmpDir := t.TempDir()
+	cmdDir := filepath.Join(tmpDir, "cmd")
+	binDir := filepath.Join(tmpDir, "bin")
+	if err := os.MkdirAll(cmdDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	fakeGit := filepath.Join(cmdDir, "git.exe")
+	if err := os.WriteFile(fakeGit, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fakeBash := filepath.Join(binDir, "bash.exe")
+	if err := os.WriteFile(fakeBash, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Override cmdLookPath to return our fake git.
+	original := cmdLookPath
+	cmdLookPath = func(file string) (string, error) {
+		if file == "git" {
+			return fakeGit, nil
+		}
+		return "", fmt.Errorf("not found")
+	}
+	t.Cleanup(func() { cmdLookPath = original })
+
+	got := gitBashPath()
+	if got != fakeBash {
+		t.Fatalf("gitBashPath() = %q, want %q", got, fakeBash)
+	}
+}
+
+func TestGitBashPathFallsBackToBareWhenNoGit(t *testing.T) {
+	original := cmdLookPath
+	cmdLookPath = func(file string) (string, error) {
+		return "", fmt.Errorf("not found")
+	}
+	t.Cleanup(func() { cmdLookPath = original })
+
+	got := gitBashPath()
+	if got != "bash" {
+		t.Fatalf("gitBashPath() = %q, want %q", got, "bash")
+	}
+}
+
+func TestBashScriptPathWindowsUsesForwardSlashes(t *testing.T) {
+	profile := system.PlatformProfile{OS: "windows", PackageManager: "winget"}
+	got := bashScriptPath(profile, `C:\Users\jorge\AppData\Local\Temp\gentleman-guardian-angel\install.sh`)
+	want := "C:/Users/jorge/AppData/Local/Temp/gentleman-guardian-angel/install.sh"
+	if got != want {
+		t.Fatalf("bashScriptPath() = %q, want %q", got, want)
 	}
 }
 
@@ -125,6 +195,18 @@ func TestResolveAgentInstall(t *testing.T) {
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
 			agent:   model.AgentOpenCode,
 			want:    CommandSequence{{"sudo", "npm", "install", "-g", "opencode-ai"}},
+		},
+		{
+			name:    "claude-code on windows uses npm without sudo",
+			profile: system.PlatformProfile{OS: "windows", PackageManager: "winget", NpmWritable: true},
+			agent:   model.AgentClaudeCode,
+			want:    CommandSequence{{"npm", "install", "-g", "@anthropic-ai/claude-code"}},
+		},
+		{
+			name:    "opencode on windows uses npm without sudo",
+			profile: system.PlatformProfile{OS: "windows", PackageManager: "winget"},
+			agent:   model.AgentOpenCode,
+			want:    CommandSequence{{"npm", "install", "-g", "opencode-ai"}},
 		},
 		{
 			name:    "unsupported agent returns error",
@@ -202,6 +284,21 @@ func TestResolveComponentInstall(t *testing.T) {
 			want: CommandSequence{
 				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", "/tmp/gentleman-guardian-angel"},
 				{"bash", "/tmp/gentleman-guardian-angel/install.sh"},
+			},
+		},
+		{
+			name:      "engram on windows uses go install",
+			profile:   system.PlatformProfile{OS: "windows", PackageManager: "winget"},
+			component: model.ComponentEngram,
+			want:      CommandSequence{{"go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}},
+		},
+		{
+			name:      "gga on windows uses git clone and git bash via temp dir",
+			profile:   system.PlatformProfile{OS: "windows", PackageManager: "winget"},
+			component: model.ComponentGGA,
+			want: CommandSequence{
+				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", filepath.Join(os.TempDir(), "gentleman-guardian-angel")},
+				{gitBashPath(), filepath.Join(os.TempDir(), "gentleman-guardian-angel", "install.sh")},
 			},
 		},
 		{

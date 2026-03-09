@@ -34,23 +34,60 @@ func TestSystemPromptFileUsesInstructionsExtension(t *testing.T) {
 	}
 }
 
+func TestSettingsPathUsesVSCodeUserProfile(t *testing.T) {
+	a := NewAdapter()
+	home := "/tmp/home"
+
+	switch runtime.GOOS {
+	case "darwin":
+		path := a.SettingsPath(home)
+		want := filepath.Join(home, "Library", "Application Support", "Code", "User", "settings.json")
+		if path != want {
+			t.Fatalf("SettingsPath() = %q, want %q", path, want)
+		}
+	case "windows":
+		appData := filepath.Join(home, "AppData", "Roaming")
+		t.Setenv("APPDATA", appData)
+		path := a.SettingsPath(home)
+		want := filepath.Join(appData, "Code", "User", "settings.json")
+		if path != want {
+			t.Fatalf("SettingsPath() = %q, want %q", path, want)
+		}
+	default:
+		t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg"))
+		path := a.SettingsPath(home)
+		want := filepath.Join(home, "xdg", "Code", "User", "settings.json")
+		if path != want {
+			t.Fatalf("SettingsPath() = %q, want %q", path, want)
+		}
+	}
+}
+
 func TestMCPConfigPathUsesVSCodeUserProfile(t *testing.T) {
 	a := NewAdapter()
 	home := "/tmp/home"
 
-	if runtime.GOOS != "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
+		path := a.MCPConfigPath(home, "context7")
+		want := filepath.Join(home, "Library", "Application Support", "Code", "User", "mcp.json")
+		if path != want {
+			t.Fatalf("MCPConfigPath() = %q, want %q", path, want)
+		}
+	case "windows":
+		appData := filepath.Join(home, "AppData", "Roaming")
+		t.Setenv("APPDATA", appData)
+		path := a.MCPConfigPath(home, "context7")
+		want := filepath.Join(appData, "Code", "User", "mcp.json")
+		if path != want {
+			t.Fatalf("MCPConfigPath() = %q, want %q", path, want)
+		}
+	default:
 		t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg"))
 		path := a.MCPConfigPath(home, "context7")
 		want := filepath.Join(home, "xdg", "Code", "User", "mcp.json")
 		if path != want {
 			t.Fatalf("MCPConfigPath() = %q, want %q", path, want)
 		}
-		return
-	}
-
-	path := a.MCPConfigPath(home, "context7")
-	want := filepath.Join(home, "Library", "Application Support", "Code", "User", "mcp.json")
-	if path != want {
-		t.Fatalf("MCPConfigPath() = %q, want %q", path, want)
 	}
 }

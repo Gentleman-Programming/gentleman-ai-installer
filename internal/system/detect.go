@@ -39,7 +39,7 @@ type DetectionResult struct {
 }
 
 func IsSupportedOS(goos string) bool {
-	return goos == "darwin" || goos == "linux"
+	return goos == "darwin" || goos == "linux" || goos == "windows"
 }
 
 func Detect(ctx context.Context) (DetectionResult, error) {
@@ -53,7 +53,12 @@ func Detect(ctx context.Context) (DetectionResult, error) {
 	osReleaseContent, _ := osReleaseContent(runtime.GOOS)
 
 	result := detectFromInputs(runtime.GOOS, runtime.GOARCH, os.Getenv("SHELL"), osReleaseContent, tools, configs)
-	result.System.Profile.NpmWritable = detectNpmWritable(homeDir)
+	// On Windows, npm global prefix is user-writable by default (no sudo needed).
+	if runtime.GOOS == "windows" {
+		result.System.Profile.NpmWritable = true
+	} else {
+		result.System.Profile.NpmWritable = detectNpmWritable(homeDir)
+	}
 	result.Dependencies = DetectDependencies(ctx, result.System.Profile)
 
 	return result, nil
@@ -72,7 +77,11 @@ func detectNpmWritable(homeDir string) bool {
 
 func detectFromInputs(goos, arch, shell, linuxOSRelease string, tools map[string]ToolStatus, configs []ConfigState) DetectionResult {
 	if shell == "" {
-		shell = "unknown"
+		if goos == "windows" {
+			shell = "powershell"
+		} else {
+			shell = "unknown"
+		}
 	}
 
 	profile := resolvePlatformProfile(goos, linuxOSRelease)
@@ -127,6 +136,10 @@ func resolvePlatformProfile(goos, linuxOSRelease string) PlatformProfile {
 			profile.Supported = false
 		}
 
+		return profile
+	case "windows":
+		profile.PackageManager = "winget"
+		profile.Supported = true
 		return profile
 	default:
 		profile.Supported = false

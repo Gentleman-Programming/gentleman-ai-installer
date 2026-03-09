@@ -2,10 +2,17 @@ package installcmd
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"github.com/gentleman-programming/gentle-ai/internal/model"
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
+
+// cmdLookPath is a package-level var for testability.
+var cmdLookPath = exec.LookPath
 
 // CommandSequence represents an ordered list of commands to run in sequence.
 // Each inner slice is a single command with its arguments (e.g., ["brew", "install", "engram"]).
@@ -37,6 +44,7 @@ func (profileResolver) ResolveAgentInstall(profile system.PlatformProfile, agent
 
 // resolveClaudeCodeInstall returns the npm install command sequence for Claude Code.
 // On Linux with system npm, sudo is required. With nvm/fnm/volta, it is not.
+// On Windows and macOS, sudo is never needed.
 func resolveClaudeCodeInstall(profile system.PlatformProfile) CommandSequence {
 	if profile.OS == "linux" && !profile.NpmWritable {
 		return CommandSequence{{"sudo", "npm", "install", "-g", "@anthropic-ai/claude-code"}}
@@ -67,6 +75,8 @@ func (profileResolver) ResolveDependencyInstall(profile system.PlatformProfile, 
 		return CommandSequence{{"sudo", "apt-get", "install", "-y", dependency}}, nil
 	case "pacman":
 		return CommandSequence{{"sudo", "pacman", "-S", "--noconfirm", dependency}}, nil
+	case "winget":
+		return CommandSequence{{"winget", "install", "--id", dependency, "-e", "--accept-source-agreements", "--accept-package-agreements"}}, nil
 	default:
 		return nil, fmt.Errorf(
 			"unsupported package manager %q for os=%q distro=%q",
@@ -92,6 +102,9 @@ func resolveOpenCodeInstall(profile system.PlatformProfile) (CommandSequence, er
 			return CommandSequence{{"npm", "install", "-g", "opencode-ai"}}, nil
 		}
 		return CommandSequence{{"sudo", "npm", "install", "-g", "opencode-ai"}}, nil
+	case "winget":
+		// On Windows, npm global installs do not require sudo.
+		return CommandSequence{{"npm", "install", "-g", "opencode-ai"}}, nil
 	default:
 		return nil, fmt.Errorf(
 			"unsupported platform for opencode: os=%q distro=%q pm=%q",
@@ -115,12 +128,73 @@ func resolveGGAInstall(profile system.PlatformProfile) (CommandSequence, error) 
 			{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", "/tmp/gentleman-guardian-angel"},
 			{"bash", "/tmp/gentleman-guardian-angel/install.sh"},
 		}, nil
+	case "winget":
+		// On Windows, use Git Bash (bundled with Git for Windows) to run the install script.
+		// We must resolve Git Bash explicitly because bare "bash" may resolve to
+		// C:\Windows\System32\bash.exe (WSL), which cannot run the script.
+		cloneDst := filepath.Join(os.TempDir(), "gentleman-guardian-angel")
+		bash := gitBashPath()
+		return CommandSequence{
+			{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", cloneDst},
+			{bash, bashScriptPath(profile, filepath.Join(cloneDst, "install.sh"))},
+		}, nil
 	default:
 		return nil, fmt.Errorf(
 			"unsupported platform for gga: os=%q distro=%q pm=%q",
 			profile.OS, profile.LinuxDistro, profile.PackageManager,
 		)
 	}
+}
+
+func bashScriptPath(profile system.PlatformProfile, path string) string {
+	if profile.OS == "windows" {
+		return strings.ReplaceAll(path, `\`, "/")
+	}
+	return path
+}
+
+// gitBashPath returns the path to Git Bash on Windows.
+// It resolves git on PATH, then finds bash.exe relative to it
+// (Git for Windows always installs both in the same bin/ directory).
+// Falls back to well-known locations, then to bare "bash" as last resort.
+func gitBashPath() string {
+	// Strategy 1: find git on PATH and derive bash.exe from it.
+	if gitPath, err := cmdLookPath("git"); err == nil {
+		// gitPath is e.g. "C:\Program Files\Git\cmd\git.exe"
+		// bash.exe lives in the sibling bin/ directory.
+		gitDir := filepath.Dir(gitPath) // .../cmd or .../bin
+		parent := filepath.Dir(gitDir)  // .../Git
+
+		candidate := filepath.Join(parent, "bin", "bash.exe")
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+
+		// git might already be in bin/ (not cmd/).
+		candidate = filepath.Join(gitDir, "bash.exe")
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+
+	// Strategy 2: well-known locations.
+	candidates := []string{
+		filepath.Join(os.Getenv("ProgramFiles"), "Git", "bin", "bash.exe"),
+		filepath.Join(os.Getenv("ProgramFiles(x86)"), "Git", "bin", "bash.exe"),
+		`C:\Program Files\Git\bin\bash.exe`,
+	}
+
+	for _, c := range candidates {
+		if c == "" {
+			continue
+		}
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
+	}
+
+	// Last resort — bare "bash" and hope it's Git Bash, not WSL.
+	return "bash"
 }
 
 // resolveEngramInstall returns the correct install command sequence for Engram per platform.
@@ -135,6 +209,9 @@ func resolveEngramInstall(profile system.PlatformProfile) (CommandSequence, erro
 		}, nil
 	case "apt", "pacman":
 		return CommandSequence{{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}}, nil
+	case "winget":
+		// On Windows, use go install (Engram has no winget package yet).
+		return CommandSequence{{"go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}}, nil
 	default:
 		return nil, fmt.Errorf(
 			"unsupported platform for engram: os=%q distro=%q pm=%q",

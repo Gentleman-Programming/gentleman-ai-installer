@@ -62,7 +62,10 @@ func (s Snapshotter) snapshotPath(snapshotDir string, sourcePath string) (Manife
 		return ManifestEntry{}, fmt.Errorf("backup source path %q is a directory", cleanSource)
 	}
 
-	relative := strings.TrimPrefix(cleanSource, string(filepath.Separator))
+	// Strip volume name (e.g. "C:") on Windows so the remaining path
+	// can be used safely as a relative directory inside the snapshot.
+	relative := strings.TrimPrefix(cleanSource, filepath.VolumeName(cleanSource))
+	relative = strings.TrimPrefix(relative, string(filepath.Separator))
 	if relative == "" {
 		relative = "root"
 	}

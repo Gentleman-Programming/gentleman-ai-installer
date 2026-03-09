@@ -1,0 +1,684 @@
+package update
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os/exec"
+	"testing"
+
+	"github.com/gentleman-programming/gentle-ai/internal/system"
+)
+
+// --- TestDetectInstalledVersion ---
+
+func TestDetectInstalledVersion(t *testing.T) {
+	tests := []struct {
+		name          string
+		tool          ToolInfo
+		currentBuild  string
+		lookPathFn    func(string) (string, error)
+		execCommandFn func(string, ...string) *exec.Cmd
+		wantVersion   string
+	}{
+		{
+			name:         "gentle-ai uses build var",
+			tool:         ToolInfo{Name: "gentle-ai", DetectCmd: nil},
+			currentBuild: "1.5.0",
+			wantVersion:  "1.5.0",
+		},
+		{
+			name:         "gentle-ai dev build",
+			tool:         ToolInfo{Name: "gentle-ai", DetectCmd: nil},
+			currentBuild: "dev",
+			wantVersion:  "dev",
+		},
+		{
+			name: "engram version parsed from output",
+			tool: ToolInfo{Name: "engram", DetectCmd: []string{"engram", "version"}},
+			lookPathFn: func(string) (string, error) {
+				return "/usr/local/bin/engram", nil
+			},
+			execCommandFn: func(name string, args ...string) *exec.Cmd {
+				return exec.Command("echo", "engram v0.3.2")
+			},
+			wantVersion: "0.3.2",
+		},
+		{
+			name: "gga not installed",
+			tool: ToolInfo{Name: "gga", DetectCmd: []string{"gga", "--version"}},
+			lookPathFn: func(string) (string, error) {
+				return "", fmt.Errorf("not found")
+			},
+			wantVersion: "",
+		},
+		{
+			name: "binary exists but version command fails",
+			tool: ToolInfo{Name: "engram", DetectCmd: []string{"engram", "version"}},
+			lookPathFn: func(string) (string, error) {
+				return "/usr/local/bin/engram", nil
+			},
+			execCommandFn: func(name string, args ...string) *exec.Cmd {
+				return exec.Command("false") // exits with error
+			},
+			wantVersion: "",
+		},
+		{
+			name: "unparseable version output",
+			tool: ToolInfo{Name: "gga", DetectCmd: []string{"gga", "--version"}},
+			lookPathFn: func(string) (string, error) {
+				return "/usr/local/bin/gga", nil
+			},
+			execCommandFn: func(name string, args ...string) *exec.Cmd {
+				return exec.Command("echo", "gga - no version info")
+			},
+			wantVersion: "",
+		},
+		{
+			name:        "empty detect cmd slice",
+			tool:        ToolInfo{Name: "test", DetectCmd: []string{}},
+			wantVersion: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			origLookPath := lookPath
+			origExecCommand := execCommand
+			t.Cleanup(func() {
+				lookPath = origLookPath
+				execCommand = origExecCommand
+			})
+
+			if tc.lookPathFn != nil {
+				lookPath = tc.lookPathFn
+			}
+			if tc.execCommandFn != nil {
+				execCommand = tc.execCommandFn
+			}
+
+			got := detectInstalledVersion(context.Background(), tc.tool, tc.currentBuild)
+			if got != tc.wantVersion {
+				t.Fatalf("detectInstalledVersion() = %q, want %q", got, tc.wantVersion)
+			}
+		})
+	}
+}
+
+// --- TestFetchLatestRelease ---
+
+func TestFetchLatestRelease(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  int
+		body    interface{}
+		wantTag string
+		wantURL string
+		wantErr bool
+	}{
+		{
+			name:   "success 200",
+			status: http.StatusOK,
+			body: githubRelease{
+				TagName: "v1.2.3",
+				HTMLURL: "https://github.com/owner/repo/releases/tag/v1.2.3",
+			},
+			wantTag: "v1.2.3",
+			wantURL: "https://github.com/owner/repo/releases/tag/v1.2.3",
+		},
+		{
+			name:    "rate limit 403",
+			status:  http.StatusForbidden,
+			body:    map[string]string{"message": "rate limit exceeded"},
+			wantErr: true,
+		},
+		{
+			name:    "not found 404",
+			status:  http.StatusNotFound,
+			body:    map[string]string{"message": "Not Found"},
+			wantErr: true,
+		},
+		{
+			name:    "server error 500",
+			status:  http.StatusInternalServerError,
+			body:    map[string]string{"message": "Internal Server Error"},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.status)
+				json.NewEncoder(w).Encode(tc.body)
+			}))
+			defer server.Close()
+
+			origClient := httpClient
+			t.Cleanup(func() { httpClient = origClient })
+
+			// Override the HTTP client to point at the test server.
+			// We also need to override the URL construction, so we use a custom transport.
+			httpClient = server.Client()
+
+			// We can't easily override the URL in fetchLatestRelease, so let's test
+			// via a helper that accepts a base URL. Instead, we'll use a roundTripper
+			// that redirects requests to our test server.
+			httpClient.Transport = &testTransport{server: server}
+
+			release, err := fetchLatestRelease(context.Background(), "owner", "repo")
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if release.TagName != tc.wantTag {
+				t.Fatalf("TagName = %q, want %q", release.TagName, tc.wantTag)
+			}
+
+			if release.HTMLURL != tc.wantURL {
+				t.Fatalf("HTMLURL = %q, want %q", release.HTMLURL, tc.wantURL)
+			}
+		})
+	}
+}
+
+// TestFetchLatestRelease_Timeout verifies timeout handling.
+func TestFetchLatestRelease_Timeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Block until context is cancelled — simulates a slow server.
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	origClient := httpClient
+	t.Cleanup(func() { httpClient = origClient })
+
+	httpClient = server.Client()
+	httpClient.Transport = &testTransport{server: server}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately to force timeout
+
+	_, err := fetchLatestRelease(ctx, "owner", "repo")
+	if err == nil {
+		t.Fatalf("expected timeout error, got nil")
+	}
+}
+
+// TestFetchLatestRelease_GithubToken verifies that GITHUB_TOKEN is sent as Bearer.
+func TestFetchLatestRelease_GithubToken(t *testing.T) {
+	var gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(githubRelease{TagName: "v1.0.0"})
+	}))
+	defer server.Close()
+
+	origClient := httpClient
+	t.Cleanup(func() { httpClient = origClient })
+
+	httpClient = server.Client()
+	httpClient.Transport = &testTransport{server: server}
+
+	t.Setenv("GITHUB_TOKEN", "test-token-123")
+
+	_, err := fetchLatestRelease(context.Background(), "owner", "repo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotAuth != "Bearer test-token-123" {
+		t.Fatalf("Authorization = %q, want %q", gotAuth, "Bearer test-token-123")
+	}
+}
+
+// --- TestCheckAll ---
+
+func TestCheckAll(t *testing.T) {
+	// Set up fake GitHub API that returns different versions per repo.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		path := r.URL.Path
+		var release githubRelease
+		switch {
+		case contains(path, "gentle-ai"):
+			release = githubRelease{TagName: "v1.5.0", HTMLURL: "https://github.com/Gentleman-Programming/gentle-ai/releases/tag/v1.5.0"}
+		case contains(path, "engram"):
+			release = githubRelease{TagName: "v0.4.0", HTMLURL: "https://github.com/Gentleman-Programming/engram/releases/tag/v0.4.0"}
+		case contains(path, "gentleman-guardian-angel"):
+			release = githubRelease{TagName: "v2.0.0", HTMLURL: "https://github.com/Gentleman-Programming/gentleman-guardian-angel/releases/tag/v2.0.0"}
+		}
+		json.NewEncoder(w).Encode(release)
+	}))
+	defer server.Close()
+
+	origClient := httpClient
+	origLookPath := lookPath
+	origExecCommand := execCommand
+	t.Cleanup(func() {
+		httpClient = origClient
+		lookPath = origLookPath
+		execCommand = origExecCommand
+	})
+
+	httpClient = server.Client()
+	httpClient.Transport = &testTransport{server: server}
+
+	// Mock: engram is installed at v0.3.2, gga is not installed.
+	lookPath = func(name string) (string, error) {
+		switch name {
+		case "engram":
+			return "/usr/local/bin/engram", nil
+		case "gga":
+			return "", fmt.Errorf("not found")
+		default:
+			return "", fmt.Errorf("not found")
+		}
+	}
+	execCommand = func(name string, args ...string) *exec.Cmd {
+		if name == "engram" {
+			return exec.Command("echo", "engram v0.3.2")
+		}
+		return exec.Command("false")
+	}
+
+	profile := system.PlatformProfile{OS: "darwin", PackageManager: "brew", Supported: true}
+	results := CheckAll(context.Background(), "1.5.0", profile)
+
+	if len(results) != 3 {
+		t.Fatalf("len(results) = %d, want 3", len(results))
+	}
+
+	// gentle-ai: 1.5.0 local == 1.5.0 remote → UpToDate
+	assertResult(t, results[0], "gentle-ai", UpToDate, "1.5.0", "1.5.0")
+
+	// engram: 0.3.2 local < 0.4.0 remote → UpdateAvailable
+	assertResult(t, results[1], "engram", UpdateAvailable, "0.3.2", "0.4.0")
+
+	// gga: not installed
+	assertResult(t, results[2], "gga", NotInstalled, "", "2.0.0")
+}
+
+func TestCheckAll_NetworkError(t *testing.T) {
+	// Server that immediately closes connections.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Close the connection without responding properly.
+		hj, ok := w.(http.Hijacker)
+		if ok {
+			conn, _, _ := hj.Hijack()
+			conn.Close()
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	origClient := httpClient
+	origLookPath := lookPath
+	origExecCommand := execCommand
+	t.Cleanup(func() {
+		httpClient = origClient
+		lookPath = origLookPath
+		execCommand = origExecCommand
+	})
+
+	httpClient = server.Client()
+	httpClient.Transport = &testTransport{server: server}
+
+	lookPath = func(string) (string, error) { return "", fmt.Errorf("not found") }
+	execCommand = func(name string, args ...string) *exec.Cmd { return exec.Command("false") }
+
+	profile := system.PlatformProfile{OS: "linux", LinuxDistro: "ubuntu", PackageManager: "apt", Supported: true}
+	results := CheckAll(context.Background(), "1.0.0", profile)
+
+	// gentle-ai has no DetectCmd, so it gets currentBuildVersion "1.0.0" as local
+	// but fetch fails → CheckFailed (it has a local version).
+	if results[0].Status != CheckFailed {
+		t.Fatalf("gentle-ai status = %q, want %q", results[0].Status, CheckFailed)
+	}
+	if results[0].Err == nil {
+		t.Fatalf("gentle-ai expected error, got nil")
+	}
+}
+
+// --- TestUpdateHint ---
+
+func TestUpdateHint(t *testing.T) {
+	tests := []struct {
+		name    string
+		tool    ToolInfo
+		profile system.PlatformProfile
+		want    string
+	}{
+		{
+			name:    "gentle-ai macOS",
+			tool:    ToolInfo{Name: "gentle-ai"},
+			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
+			want:    "brew upgrade gentle-ai",
+		},
+		{
+			name:    "gentle-ai linux",
+			tool:    ToolInfo{Name: "gentle-ai"},
+			profile: system.PlatformProfile{OS: "linux", PackageManager: "apt"},
+			want:    "curl -fsSL https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.sh | bash",
+		},
+		{
+			name:    "gentle-ai windows",
+			tool:    ToolInfo{Name: "gentle-ai"},
+			profile: system.PlatformProfile{OS: "windows", PackageManager: "winget"},
+			want:    "irm https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.ps1 | iex",
+		},
+		{
+			name:    "engram macOS brew",
+			tool:    ToolInfo{Name: "engram"},
+			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
+			want:    "brew upgrade engram",
+		},
+		{
+			name:    "engram linux",
+			tool:    ToolInfo{Name: "engram"},
+			profile: system.PlatformProfile{OS: "linux", PackageManager: "apt"},
+			want:    "go install github.com/Gentleman-Programming/engram/cmd/engram@latest",
+		},
+		{
+			name:    "engram windows",
+			tool:    ToolInfo{Name: "engram"},
+			profile: system.PlatformProfile{OS: "windows", PackageManager: "winget"},
+			want:    "go install github.com/Gentleman-Programming/engram/cmd/engram@latest",
+		},
+		{
+			name:    "gga macOS brew",
+			tool:    ToolInfo{Name: "gga"},
+			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
+			want:    "brew upgrade gga",
+		},
+		{
+			name:    "gga linux",
+			tool:    ToolInfo{Name: "gga"},
+			profile: system.PlatformProfile{OS: "linux", PackageManager: "apt"},
+			want:    "See https://github.com/Gentleman-Programming/gentleman-guardian-angel",
+		},
+		{
+			name:    "unknown tool",
+			tool:    ToolInfo{Name: "unknown"},
+			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
+			want:    "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := updateHint(tc.tool, tc.profile)
+			if got != tc.want {
+				t.Fatalf("updateHint(%q, %q) = %q, want %q", tc.tool.Name, tc.profile.OS, got, tc.want)
+			}
+		})
+	}
+}
+
+// --- TestVersionComparison ---
+
+func TestVersionComparison(t *testing.T) {
+	tests := []struct {
+		name   string
+		local  string
+		remote string
+		want   UpdateStatus
+	}{
+		{name: "equal", local: "1.2.3", remote: "1.2.3", want: UpToDate},
+		{name: "local newer major", local: "2.0.0", remote: "1.9.9", want: UpToDate},
+		{name: "local newer minor", local: "1.3.0", remote: "1.2.9", want: UpToDate},
+		{name: "local newer patch", local: "1.2.4", remote: "1.2.3", want: UpToDate},
+		{name: "remote newer major", local: "1.0.0", remote: "2.0.0", want: UpdateAvailable},
+		{name: "remote newer minor", local: "1.2.0", remote: "1.3.0", want: UpdateAvailable},
+		{name: "remote newer patch", local: "1.2.3", remote: "1.2.4", want: UpdateAvailable},
+		{name: "missing patch local", local: "1.2", remote: "1.2.1", want: UpdateAvailable},
+		{name: "missing patch remote", local: "1.2.1", remote: "1.2", want: UpToDate},
+		{name: "both missing patch equal", local: "1.2", remote: "1.2", want: UpToDate},
+		{name: "zeros", local: "0.0.0", remote: "0.0.0", want: UpToDate},
+		{name: "zero vs nonzero", local: "0.0.0", remote: "0.0.1", want: UpdateAvailable},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := compareVersions(tc.local, tc.remote)
+			if got != tc.want {
+				t.Fatalf("compareVersions(%q, %q) = %q, want %q", tc.local, tc.remote, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeVersion(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{name: "with v prefix", raw: "v1.2.3", want: "1.2.3"},
+		{name: "without prefix", raw: "1.2.3", want: "1.2.3"},
+		{name: "with spaces", raw: "  v1.2.3  ", want: "1.2.3"},
+		{name: "two parts", raw: "v1.2", want: "1.2"},
+		{name: "dev", raw: "dev", want: "dev"},
+		{name: "empty", raw: "", want: ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := normalizeVersion(tc.raw)
+			if got != tc.want {
+				t.Fatalf("normalizeVersion(%q) = %q, want %q", tc.raw, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestIsSemver(t *testing.T) {
+	tests := []struct {
+		version string
+		want    bool
+	}{
+		{"1.2.3", true},
+		{"1.2", true},
+		{"0.0.0", true},
+		{"dev", false},
+		{"", false},
+		{"abc", false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.version, func(t *testing.T) {
+			got := isSemver(tc.version)
+			if got != tc.want {
+				t.Fatalf("isSemver(%q) = %v, want %v", tc.version, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseVersionParts(t *testing.T) {
+	tests := []struct {
+		name    string
+		version string
+		want    [3]int
+	}{
+		{name: "full semver", version: "1.2.3", want: [3]int{1, 2, 3}},
+		{name: "two parts", version: "1.2", want: [3]int{1, 2, 0}},
+		{name: "one part", version: "1", want: [3]int{1, 0, 0}},
+		{name: "empty", version: "", want: [3]int{0, 0, 0}},
+		{name: "non-numeric", version: "abc.def", want: [3]int{0, 0, 0}},
+		{name: "large numbers", version: "100.200.300", want: [3]int{100, 200, 300}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseVersionParts(tc.version)
+			if got != tc.want {
+				t.Fatalf("parseVersionParts(%q) = %v, want %v", tc.version, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseVersionFromOutput(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{name: "engram v0.3.2", output: "engram v0.3.2", want: "0.3.2"},
+		{name: "gga 1.0.0", output: "gga version 1.0.0", want: "1.0.0"},
+		{name: "bare version", output: "2.1.0", want: "2.1.0"},
+		{name: "no version", output: "no version info here", want: ""},
+		{name: "empty", output: "", want: ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseVersionFromOutput(tc.output)
+			if got != tc.want {
+				t.Fatalf("parseVersionFromOutput(%q) = %q, want %q", tc.output, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestRegistryContents verifies the registry has all expected tools.
+func TestRegistryContents(t *testing.T) {
+	if len(Tools) != 3 {
+		t.Fatalf("len(Tools) = %d, want 3", len(Tools))
+	}
+
+	expected := map[string]struct {
+		owner string
+		repo  string
+	}{
+		"gentle-ai": {owner: "Gentleman-Programming", repo: "gentle-ai"},
+		"engram":    {owner: "Gentleman-Programming", repo: "engram"},
+		"gga":       {owner: "Gentleman-Programming", repo: "gentleman-guardian-angel"},
+	}
+
+	for _, tool := range Tools {
+		exp, ok := expected[tool.Name]
+		if !ok {
+			t.Fatalf("unexpected tool in registry: %q", tool.Name)
+		}
+		if tool.Owner != exp.owner {
+			t.Fatalf("tool %q Owner = %q, want %q", tool.Name, tool.Owner, exp.owner)
+		}
+		if tool.Repo != exp.repo {
+			t.Fatalf("tool %q Repo = %q, want %q", tool.Name, tool.Repo, exp.repo)
+		}
+	}
+
+	// gentle-ai must have nil DetectCmd.
+	if Tools[0].DetectCmd != nil {
+		t.Fatalf("gentle-ai DetectCmd should be nil")
+	}
+
+	// engram and gga must have non-nil DetectCmd.
+	if Tools[1].DetectCmd == nil {
+		t.Fatalf("engram DetectCmd should not be nil")
+	}
+	if Tools[2].DetectCmd == nil {
+		t.Fatalf("gga DetectCmd should not be nil")
+	}
+}
+
+// TestCheckAll_DevVersion verifies that "dev" build version results in VersionUnknown.
+func TestCheckAll_DevVersion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(githubRelease{TagName: "v1.0.0"})
+	}))
+	defer server.Close()
+
+	origClient := httpClient
+	origLookPath := lookPath
+	origExecCommand := execCommand
+
+	// Override only the first tool (gentle-ai) by running CheckAll with "dev".
+	origTools := Tools
+	t.Cleanup(func() {
+		httpClient = origClient
+		lookPath = origLookPath
+		execCommand = origExecCommand
+		Tools = origTools
+	})
+
+	httpClient = server.Client()
+	httpClient.Transport = &testTransport{server: server}
+
+	// Restrict to just gentle-ai to isolate the test.
+	Tools = []ToolInfo{Tools[0]}
+
+	lookPath = func(string) (string, error) { return "", fmt.Errorf("not found") }
+	execCommand = func(name string, args ...string) *exec.Cmd { return exec.Command("false") }
+
+	profile := system.PlatformProfile{OS: "darwin", PackageManager: "brew", Supported: true}
+	results := CheckAll(context.Background(), "dev", profile)
+
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(results))
+	}
+
+	if results[0].Status != VersionUnknown {
+		t.Fatalf("gentle-ai dev status = %q, want %q", results[0].Status, VersionUnknown)
+	}
+}
+
+// --- helpers ---
+
+// testTransport redirects all requests to the test server.
+type testTransport struct {
+	server *httptest.Server
+}
+
+func (tt *testTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Rewrite the request URL to point at the test server, preserving the path.
+	req.URL.Scheme = "http"
+	req.URL.Host = tt.server.Listener.Addr().String()
+	return http.DefaultTransport.RoundTrip(req)
+}
+
+func assertResult(t *testing.T, r UpdateResult, wantName string, wantStatus UpdateStatus, wantInstalled, wantLatest string) {
+	t.Helper()
+
+	if r.Tool.Name != wantName {
+		t.Fatalf("tool name = %q, want %q", r.Tool.Name, wantName)
+	}
+	if r.Status != wantStatus {
+		t.Fatalf("%s status = %q, want %q (installed=%q, latest=%q, err=%v)",
+			wantName, r.Status, wantStatus, r.InstalledVersion, r.LatestVersion, r.Err)
+	}
+	if r.InstalledVersion != wantInstalled {
+		t.Fatalf("%s InstalledVersion = %q, want %q", wantName, r.InstalledVersion, wantInstalled)
+	}
+	if r.LatestVersion != wantLatest {
+		t.Fatalf("%s LatestVersion = %q, want %q", wantName, r.LatestVersion, wantLatest)
+	}
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}

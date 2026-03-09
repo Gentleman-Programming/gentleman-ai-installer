@@ -1,33 +1,50 @@
 ## Engram Persistent Memory — Protocol
 
 You have access to Engram, a persistent memory system that survives across sessions and compactions.
+This protocol is MANDATORY and ALWAYS ACTIVE — not something you activate on demand.
 
-### WHEN TO SAVE (mandatory — not optional)
+### PROACTIVE SAVE TRIGGERS (mandatory — do NOT wait for user to ask)
 
-Call `mem_save` IMMEDIATELY after any of these:
-- Bug fix completed
+Call `mem_save` IMMEDIATELY and WITHOUT BEING ASKED after any of these:
+
+#### After decisions or conventions
 - Architecture or design decision made
+- Team convention documented or established
+- Workflow change agreed upon
+- Tool or library choice made with tradeoffs
+
+#### After completing work
+- Bug fix completed (include root cause)
+- Feature implemented with non-obvious approach
+- Notion/Jira/GitHub artifact created or updated with significant content
+- Configuration change or environment setup done
+
+#### After discoveries
 - Non-obvious discovery about the codebase
-- Configuration change or environment setup
+- Gotcha, edge case, or unexpected behavior found
 - Pattern established (naming, structure, convention)
 - User preference or constraint learned
+
+#### Self-check — ask yourself after EVERY task:
+> "Did I just make a decision, fix a bug, learn something non-obvious, or establish a convention? If yes, call mem_save NOW."
 
 Format for `mem_save`:
 - **title**: Verb + what — short, searchable (e.g. "Fixed N+1 query in UserList", "Chose Zustand over Redux")
 - **type**: bugfix | decision | architecture | discovery | pattern | config | preference
 - **scope**: `project` (default) | `personal`
-- **topic_key** (optional, recommended for evolving decisions): stable key like `architecture/auth-model`
+- **topic_key** (optional but recommended for evolving topics): stable key like `architecture/auth-model`
 - **content**:
   **What**: One sentence — what was done
   **Why**: What motivated it (user request, bug, performance, etc.)
   **Where**: Files or paths affected
   **Learned**: Gotchas, edge cases, things that surprised you (omit if none)
 
-Topic rules:
-- Different topics must not overwrite each other (e.g. architecture vs bugfix)
-- Reuse the same `topic_key` to update an evolving topic instead of creating new observations
-- If unsure about the key, call `mem_suggest_topic_key` first and then reuse it
-- Use `mem_update` when you have an exact observation ID to correct
+#### Topic update rules (mandatory)
+
+- Different topics MUST NOT overwrite each other (example: architecture decision vs bugfix)
+- If the same topic evolves, call `mem_save` with the same `topic_key` so memory is updated (upsert) instead of creating a new observation
+- If unsure about the key, call `mem_suggest_topic_key` first, then reuse that key consistently
+- If you already know the exact ID to fix, use `mem_update`
 
 ### WHEN TO SEARCH MEMORY
 
@@ -40,6 +57,7 @@ When the user asks to recall something — any variation of "remember", "recall"
 Also search memory PROACTIVELY when:
 - Starting work on something that might have been done before
 - The user mentions a topic you have no context on — check if past sessions covered it
+- The user's FIRST message references the project, a feature, or a problem — call `mem_search` with keywords from their message to check for prior work before responding
 
 ### SESSION CLOSE PROTOCOL (mandatory)
 

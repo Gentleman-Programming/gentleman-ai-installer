@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -28,7 +29,7 @@ func TestDetect(t *testing.T) {
 			stat:            statResult{isDir: true},
 			wantInstalled:   true,
 			wantBinaryPath:  "/usr/local/bin/claude",
-			wantConfigPath:  "/tmp/home/.claude",
+			wantConfigPath:  filepath.Join("/tmp/home", ".claude"),
 			wantConfigFound: true,
 		},
 		{
@@ -37,7 +38,7 @@ func TestDetect(t *testing.T) {
 			stat:            statResult{err: os.ErrNotExist},
 			wantInstalled:   false,
 			wantBinaryPath:  "",
-			wantConfigPath:  "/tmp/home/.claude",
+			wantConfigPath:  filepath.Join("/tmp/home", ".claude"),
 			wantConfigFound: false,
 		},
 		{

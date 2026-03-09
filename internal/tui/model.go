@@ -18,6 +18,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/stackdetect"
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 	"github.com/gentleman-programming/gentle-ai/internal/tui/screens"
+	"github.com/gentleman-programming/gentle-ai/internal/update"
 )
 
 // spinnerFrames are the braille characters used for the animated spinner.
@@ -47,6 +48,11 @@ type PipelineDoneMsg struct {
 // BackupRestoreMsg is sent when a backup restore completes.
 type BackupRestoreMsg struct {
 	Err error
+}
+
+// UpdateCheckResultMsg is sent when the background update check completes.
+type UpdateCheckResultMsg struct {
+	Results []update.UpdateResult
 }
 
 // skillsLoadedMsg is sent when the skill discovery search completes.
@@ -137,6 +143,12 @@ type Model struct {
 	// RestoreFn is called to restore a backup. When nil, restore is a no-op.
 	RestoreFn RestoreFunc
 
+	// UpdateResults holds the results of the background update check.
+	UpdateResults []update.UpdateResult
+
+	// UpdateCheckDone is true once the background update check has completed.
+	UpdateCheckDone bool
+
 	// pipelineRunning tracks whether the pipeline goroutine is active.
 	pipelineRunning bool
 
@@ -166,7 +178,15 @@ func NewModel(detection system.DetectionResult, version string) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	version := m.Version
+	profile := m.Detection.System.Profile
+
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		results := update.CheckAll(ctx, version, profile)
+		return UpdateCheckResultMsg{Results: results}
+	}
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -187,6 +207,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handlePipelineDone(msg)
 	case BackupRestoreMsg:
 		return m.handleBackupRestore(msg)
+	case UpdateCheckResultMsg:
+		m.UpdateResults = msg.Results
+		m.UpdateCheckDone = true
+		return m, nil
 	case skillsLoadedMsg:
 		return m.handleSkillsLoaded(msg)
 	case skillInstallDoneMsg:
@@ -344,7 +368,11 @@ func (m Model) findProgressItem(stepID string) int {
 func (m Model) View() string {
 	switch m.Screen {
 	case ScreenWelcome:
-		return screens.RenderWelcome(m.Cursor, m.Version)
+		var banner string
+		if m.UpdateCheckDone && update.HasUpdates(m.UpdateResults) {
+			banner = "Updates available: " + update.UpdateSummaryLine(m.UpdateResults)
+		}
+		return screens.RenderWelcome(m.Cursor, m.Version, banner)
 	case ScreenDetection:
 		return screens.RenderDetection(m.Detection, m.Cursor)
 	case ScreenAgents:
@@ -366,6 +394,7 @@ func (m Model) View() string {
 			FailedSteps:         extractFailedSteps(m.Execution),
 			RollbackPerformed:   len(m.Execution.Rollback.Steps) > 0,
 			MissingDeps:         extractMissingDeps(m.Detection),
+			AvailableUpdates:    extractAvailableUpdates(m.UpdateResults),
 		})
 	case ScreenBackups:
 		return screens.RenderBackups(m.Backups, m.Cursor)
@@ -1065,6 +1094,21 @@ func InstallSkillCmd(skill screens.SkillDiscoveryItem, index int) tea.Cmd {
 		}
 		return skillInstallDoneMsg{Index: index, Err: err}
 	}
+}
+
+func extractAvailableUpdates(results []update.UpdateResult) []screens.UpdateInfo {
+	var updates []screens.UpdateInfo
+	for _, r := range results {
+		if r.Status == update.UpdateAvailable {
+			updates = append(updates, screens.UpdateInfo{
+				Name:             r.Tool.Name,
+				InstalledVersion: r.InstalledVersion,
+				LatestVersion:    r.LatestVersion,
+				UpdateHint:       r.UpdateHint,
+			})
+		}
+	}
+	return updates
 }
 
 func componentsForPreset(preset model.PresetID) []model.ComponentID {

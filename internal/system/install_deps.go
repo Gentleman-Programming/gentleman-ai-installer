@@ -7,6 +7,8 @@ func installHintGit(profile PlatformProfile) string {
 	switch {
 	case profile.OS == "darwin":
 		return "brew install git"
+	case profile.OS == "windows":
+		return "winget install Git.Git"
 	case profile.PackageManager == "apt":
 		return "sudo apt-get install -y git"
 	case profile.PackageManager == "pacman":
@@ -21,6 +23,8 @@ func installHintCurl(profile PlatformProfile) string {
 	switch {
 	case profile.OS == "darwin":
 		return "brew install curl"
+	case profile.OS == "windows":
+		return "curl is pre-installed on Windows 10+"
 	case profile.PackageManager == "apt":
 		return "sudo apt-get install -y curl"
 	case profile.PackageManager == "pacman":
@@ -35,6 +39,8 @@ func installHintNode(profile PlatformProfile) string {
 	switch {
 	case profile.OS == "darwin":
 		return "brew install node"
+	case profile.OS == "windows":
+		return "winget install OpenJS.NodeJS.LTS"
 	case profile.PackageManager == "apt":
 		return "curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && sudo apt-get install -y nodejs"
 	case profile.PackageManager == "pacman":
@@ -60,6 +66,8 @@ func installHintGo(profile PlatformProfile) string {
 	switch {
 	case profile.OS == "darwin":
 		return "brew install go"
+	case profile.OS == "windows":
+		return "winget install GoLang.Go"
 	case profile.PackageManager == "apt":
 		return "sudo apt-get install -y golang"
 	case profile.PackageManager == "pacman":
@@ -95,6 +103,8 @@ func installCommandsGit(profile PlatformProfile) [][]string {
 	switch {
 	case profile.OS == "darwin":
 		return [][]string{{"brew", "install", "git"}}
+	case profile.OS == "windows":
+		return [][]string{{"winget", "install", "--id", "Git.Git", "-e", "--accept-source-agreements", "--accept-package-agreements"}}
 	case profile.PackageManager == "apt":
 		return [][]string{{"sudo", "apt-get", "install", "-y", "git"}}
 	case profile.PackageManager == "pacman":
@@ -108,6 +118,9 @@ func installCommandsCurl(profile PlatformProfile) [][]string {
 	switch {
 	case profile.OS == "darwin":
 		return [][]string{{"brew", "install", "curl"}}
+	case profile.OS == "windows":
+		// curl is pre-installed on Windows 10+, no install command needed.
+		return nil
 	case profile.PackageManager == "apt":
 		return [][]string{{"sudo", "apt-get", "install", "-y", "curl"}}
 	case profile.PackageManager == "pacman":
@@ -121,6 +134,8 @@ func installCommandsNode(profile PlatformProfile) [][]string {
 	switch {
 	case profile.OS == "darwin":
 		return [][]string{{"brew", "install", "node"}}
+	case profile.OS == "windows":
+		return [][]string{{"winget", "install", "--id", "OpenJS.NodeJS.LTS", "-e", "--accept-source-agreements", "--accept-package-agreements"}}
 	case profile.PackageManager == "apt":
 		// NodeSource LTS setup + install.
 		return [][]string{
@@ -147,6 +162,8 @@ func installCommandsGo(profile PlatformProfile) [][]string {
 	switch {
 	case profile.OS == "darwin":
 		return [][]string{{"brew", "install", "go"}}
+	case profile.OS == "windows":
+		return [][]string{{"winget", "install", "--id", "GoLang.Go", "-e", "--accept-source-agreements", "--accept-package-agreements"}}
 	case profile.PackageManager == "apt":
 		return [][]string{{"sudo", "apt-get", "install", "-y", "golang"}}
 	case profile.PackageManager == "pacman":
