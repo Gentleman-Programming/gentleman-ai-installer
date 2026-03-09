@@ -1,7 +1,10 @@
 package tui
 
 import (
+	"context"
 	"fmt"
+	"os/exec"
+	"sort"
 	"strings"
 	"time"
 
@@ -11,6 +14,8 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/model"
 	"github.com/gentleman-programming/gentle-ai/internal/pipeline"
 	"github.com/gentleman-programming/gentle-ai/internal/planner"
+	"github.com/gentleman-programming/gentle-ai/internal/skillssh"
+	"github.com/gentleman-programming/gentle-ai/internal/stackdetect"
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 	"github.com/gentleman-programming/gentle-ai/internal/tui/screens"
 )
@@ -44,6 +49,40 @@ type BackupRestoreMsg struct {
 	Err error
 }
 
+// skillsLoadedMsg is sent when the skill discovery search completes.
+type skillsLoadedMsg struct {
+	Skills []screens.SkillDiscoveryItem
+	Err    error
+}
+
+// skillInstallDoneMsg is sent when a single skill installation finishes.
+type skillInstallDoneMsg struct {
+	Index int
+	Err   error
+}
+
+// manualSearchDoneMsg is sent when a manual (user-typed) skill search completes.
+type manualSearchDoneMsg struct {
+	Results []screens.SkillDiscoveryItem
+	Err     error
+}
+
+// skillDiscoveryState holds the transient state for the skill discovery screen.
+type skillDiscoveryState struct {
+	SubState     screens.SkillDiscoverySubState
+	Skills       []screens.SkillDiscoveryItem
+	CurrentIndex int
+	Selected     []screens.SkillDiscoveryItem
+	Installing   int
+	Error        string
+	Failures     map[int]string // index in Selected → error message
+
+	// Manual search sub-state fields.
+	SearchQuery        string
+	SearchResults      []screens.SkillDiscoveryItem
+	SearchSelected     map[int]bool
+	SearchResultCursor int
+}
 // ExecuteFunc builds and runs the installation pipeline. It receives a ProgressFunc
 // callback to emit step-level progress events, and returns the ExecutionResult.
 type ExecuteFunc func(
@@ -70,6 +109,7 @@ const (
 	ScreenInstalling
 	ScreenComplete
 	ScreenBackups
+	ScreenSkillDiscovery
 )
 
 type Model struct {
@@ -99,6 +139,9 @@ type Model struct {
 
 	// pipelineRunning tracks whether the pipeline goroutine is active.
 	pipelineRunning bool
+
+	// skillDiscovery holds the transient state for the skill discovery screen.
+	skillDiscovery skillDiscoveryState
 }
 
 func NewModel(detection system.DetectionResult, version string) Model {
@@ -144,6 +187,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handlePipelineDone(msg)
 	case BackupRestoreMsg:
 		return m.handleBackupRestore(msg)
+	case skillsLoadedMsg:
+		return m.handleSkillsLoaded(msg)
+	case skillInstallDoneMsg:
+		return m.handleSkillInstallDone(msg)
+	case manualSearchDoneMsg:
+		return m.handleManualSearchDone(msg)
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
 	}
@@ -218,6 +267,71 @@ func (m Model) handleBackupRestore(msg BackupRestoreMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) handleSkillsLoaded(msg skillsLoadedMsg) (tea.Model, tea.Cmd) {
+	if m.Screen != ScreenSkillDiscovery {
+		return m, nil
+	}
+
+	if msg.Err != nil {
+		m.skillDiscovery.Error = msg.Err.Error()
+		// Stay in loading sub-state so the user sees the error banner; a future
+		// Batch C key-handler will allow the user to quit the screen.
+		return m, nil
+	}
+
+	if len(msg.Skills) == 0 {
+		// No skills found — jump straight to browsing so the empty-state UI is
+		// shown instead of leaving the user stuck on the spinner.
+		m.skillDiscovery.SubState = screens.SkillDiscoveryBrowsing
+		m.skillDiscovery.Skills = nil
+		return m, nil
+	}
+
+	m.skillDiscovery.SubState = screens.SkillDiscoveryBrowsing
+	m.skillDiscovery.Skills = msg.Skills
+	m.skillDiscovery.CurrentIndex = 0
+	return m, nil
+}
+
+func (m Model) handleSkillInstallDone(msg skillInstallDoneMsg) (tea.Model, tea.Cmd) {
+	if m.Screen != ScreenSkillDiscovery {
+		return m, nil
+	}
+
+	if msg.Err != nil {
+		// Non-fatal: record per-skill failure and continue to the next skill.
+		if m.skillDiscovery.Failures == nil {
+			m.skillDiscovery.Failures = make(map[int]string)
+		}
+		m.skillDiscovery.Failures[msg.Index] = msg.Err.Error()
+	}
+
+	next := msg.Index + 1
+	if next >= len(m.skillDiscovery.Selected) {
+		// All installs done.
+		m.skillDiscovery.SubState = screens.SkillDiscoveryDone
+		return m, nil
+	}
+
+	m.skillDiscovery.Installing = next
+	return m, InstallSkillCmd(m.skillDiscovery.Selected[next], next)
+}
+
+func (m Model) handleManualSearchDone(msg manualSearchDoneMsg) (tea.Model, tea.Cmd) {
+	if m.Screen != ScreenSkillDiscovery {
+		return m, nil
+	}
+
+	if msg.Err != nil {
+		m.skillDiscovery.Error = msg.Err.Error()
+	}
+
+	m.skillDiscovery.SearchResults = msg.Results
+	m.skillDiscovery.SearchSelected = make(map[int]bool)
+	m.skillDiscovery.SubState = screens.SkillDiscoverySearchResults
+	return m, nil
+}
+
 func (m Model) findProgressItem(stepID string) int {
 	for i, item := range m.Progress.Items {
 		if item.Label == stepID {
@@ -255,12 +369,31 @@ func (m Model) View() string {
 		})
 	case ScreenBackups:
 		return screens.RenderBackups(m.Backups, m.Cursor)
+	case ScreenSkillDiscovery:
+		return screens.RenderSkillDiscovery(screens.SkillDiscoveryViewState{
+			SubState:       m.skillDiscovery.SubState,
+			Skills:         m.skillDiscovery.Skills,
+			CurrentIndex:   m.skillDiscovery.CurrentIndex,
+			Selected:       m.skillDiscovery.Selected,
+			Installing:     m.skillDiscovery.Installing,
+			Error:          m.skillDiscovery.Error,
+			Failures:       m.skillDiscovery.Failures,
+			SearchQuery:        m.skillDiscovery.SearchQuery,
+			SearchResults:      m.skillDiscovery.SearchResults,
+			SearchSelected:     m.skillDiscovery.SearchSelected,
+			SearchResultCursor: m.skillDiscovery.SearchResultCursor,
+		})
 	default:
 		return ""
 	}
 }
 
 func (m Model) handleKeyPress(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Screen-specific handlers that take priority over global bindings.
+	if m.Screen == ScreenSkillDiscovery {
+		return m.handleSkillDiscoveryKey(key)
+	}
+
 	switch key.String() {
 	case "ctrl+c", "q":
 		return m, tea.Quit
@@ -297,6 +430,176 @@ func (m Model) handleKeyPress(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// isSkillAlreadySelected returns true if the skill is already in the Selected list.
+func (m Model) isSkillAlreadySelected(skill screens.SkillDiscoveryItem) bool {
+	for _, s := range m.skillDiscovery.Selected {
+		if s.Name == skill.Name && s.Source == skill.Source {
+			return true
+		}
+	}
+	return false
+}
+
+// handleSkillDiscoveryKey routes key presses while on ScreenSkillDiscovery.
+func (m Model) handleSkillDiscoveryKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch m.skillDiscovery.SubState {
+	case screens.SkillDiscoveryLoading:
+		// Allow cancelling while the search is in flight.
+		switch key.Type {
+		case tea.KeyCtrlC:
+			return m, tea.Quit
+		case tea.KeyEsc:
+			m.setScreen(ScreenWelcome)
+		}
+		return m, nil
+
+	case screens.SkillDiscoveryInstalling:
+		// Block all keys while install is running; only ctrl+c is honoured.
+		if key.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		return m, nil
+
+	case screens.SkillDiscoveryBrowsing:
+		switch key.Type {
+		case tea.KeyCtrlC:
+			return m, tea.Quit
+		case tea.KeyUp:
+			if len(m.skillDiscovery.Skills) > 0 {
+				skill := m.skillDiscovery.Skills[m.skillDiscovery.CurrentIndex]
+				if !m.isSkillAlreadySelected(skill) {
+					m.skillDiscovery.Selected = append(m.skillDiscovery.Selected, skill)
+				} else {
+					m.skillDiscovery.Error = "\"" + skill.Name + "\" ya está en la lista"
+				}
+			}
+			return m.advanceSkillIndex()
+		case tea.KeyRight:
+			return m.advanceSkillIndex()
+		case tea.KeyEsc:
+			// Finish browsing → go to search prompt.
+			m.skillDiscovery.SubState = screens.SkillDiscoverySearchPrompt
+			m.skillDiscovery.SearchQuery = ""
+		}
+
+	case screens.SkillDiscoverySearchPrompt:
+		switch key.Type {
+		case tea.KeyCtrlC:
+			return m, tea.Quit
+		case tea.KeyEsc:
+			// Esc = done searching, install everything selected so far.
+			return m.startSkillInstall()
+		case tea.KeyEnter:
+			if m.skillDiscovery.SearchQuery == "" {
+				return m.startSkillInstall()
+			}
+			query := m.skillDiscovery.SearchQuery
+			return m, SearchManualCmd(query)
+		case tea.KeyBackspace:
+			q := m.skillDiscovery.SearchQuery
+			if len(q) > 0 {
+				m.skillDiscovery.SearchQuery = q[:len(q)-1]
+			}
+		case tea.KeyRunes:
+			m.skillDiscovery.SearchQuery += string(key.Runes)
+		}
+
+	case screens.SkillDiscoverySearchResults:
+		switch key.Type {
+		case tea.KeyCtrlC:
+			return m, tea.Quit
+		case tea.KeyEsc:
+			// Back to search prompt without adding anything.
+			m.skillDiscovery.SearchResults = nil
+			m.skillDiscovery.SearchSelected = nil
+			m.skillDiscovery.SearchResultCursor = 0
+			m.skillDiscovery.SearchQuery = ""
+			m.skillDiscovery.SubState = screens.SkillDiscoverySearchPrompt
+		case tea.KeyUp:
+			if m.skillDiscovery.SearchResultCursor > 0 {
+				m.skillDiscovery.SearchResultCursor--
+			}
+		case tea.KeyDown:
+			max := len(m.skillDiscovery.SearchResults) - 1
+			if m.skillDiscovery.SearchResultCursor < max {
+				m.skillDiscovery.SearchResultCursor++
+			}
+		case tea.KeyEnter:
+			// Add the currently highlighted skill and go back to search prompt.
+			cursor := m.skillDiscovery.SearchResultCursor
+			if cursor < len(m.skillDiscovery.SearchResults) {
+				skill := m.skillDiscovery.SearchResults[cursor]
+				if !m.isSkillAlreadySelected(skill) {
+					m.skillDiscovery.Selected = append(m.skillDiscovery.Selected, skill)
+					m.skillDiscovery.Error = ""
+				} else {
+					m.skillDiscovery.Error = "\"" + skill.Name + "\" ya está en la lista"
+				}
+			}
+			m.skillDiscovery.SearchResults = nil
+			m.skillDiscovery.SearchSelected = nil
+			m.skillDiscovery.SearchResultCursor = 0
+			m.skillDiscovery.SearchQuery = ""
+			m.skillDiscovery.SubState = screens.SkillDiscoverySearchPrompt
+		}
+
+	case screens.SkillDiscoveryDone:
+		switch key.Type {
+		case tea.KeyCtrlC:
+			return m, tea.Quit
+		case tea.KeyEnter, tea.KeyEsc:
+			m.setScreen(ScreenWelcome)
+		}
+
+	default:
+		// Loading sub-state or unknown — only allow ctrl+c.
+		if key.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+	}
+
+	return m, nil
+}
+
+// toggleSearchResult toggles selection for the given zero-based index in SearchResults.
+func (m *Model) toggleSearchResult(idx int) {
+	if idx >= len(m.skillDiscovery.SearchResults) {
+		return
+	}
+	if m.skillDiscovery.SearchSelected == nil {
+		m.skillDiscovery.SearchSelected = make(map[int]bool)
+	}
+	m.skillDiscovery.SearchSelected[idx] = !m.skillDiscovery.SearchSelected[idx]
+}
+
+// startSkillInstall transitions to the Installing sub-state (or Done if nothing selected).
+func (m Model) startSkillInstall() (tea.Model, tea.Cmd) {
+	if len(m.skillDiscovery.Selected) == 0 {
+		m.skillDiscovery.SubState = screens.SkillDiscoveryDone
+		return m, nil
+	}
+	m.skillDiscovery.SubState = screens.SkillDiscoveryInstalling
+	m.skillDiscovery.Installing = 0
+	first := m.skillDiscovery.Selected[0]
+	return m, InstallSkillCmd(first, 0)
+}
+
+// advanceSkillIndex moves CurrentIndex forward after an add/skip decision.
+// When the last skill has been browsed it transitions to SkillDiscoverySearchPrompt
+// so the user can optionally search for more skills before installing.
+func (m Model) advanceSkillIndex() (tea.Model, tea.Cmd) {
+	next := m.skillDiscovery.CurrentIndex + 1
+	if next < len(m.skillDiscovery.Skills) {
+		m.skillDiscovery.CurrentIndex = next
+		return m, nil
+	}
+
+	// Reached the end of the recommended list — offer manual search.
+	m.skillDiscovery.SubState = screens.SkillDiscoverySearchPrompt
+	m.skillDiscovery.SearchQuery = ""
+	return m, nil
+}
+
 func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 	switch m.Screen {
 	case ScreenWelcome:
@@ -305,6 +608,8 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 			m.setScreen(ScreenDetection)
 		case 1:
 			m.setScreen(ScreenBackups)
+		case 2:
+			return m.startSkillDiscovery()
 		default:
 			return m, tea.Quit
 		}
@@ -515,6 +820,8 @@ func (m Model) optionCount() int {
 		return 1
 	case ScreenBackups:
 		return len(m.Backups) + 1
+	case ScreenSkillDiscovery:
+		return 1
 	default:
 		return 0
 	}
@@ -623,6 +930,135 @@ func extractFailedSteps(result pipeline.ExecutionResult) []screens.FailedStep {
 	collect(result.Prepare.Steps)
 	collect(result.Apply.Steps)
 	return failed
+}
+
+// startSkillDiscovery initialises the skill discovery flow.
+// It guards against npx not being installed, detects the project stack,
+// transitions to ScreenSkillDiscovery, and fires the async search command.
+func (m Model) startSkillDiscovery() (tea.Model, tea.Cmd) {
+	if _, err := exec.LookPath("npx"); err != nil {
+		m.Err = fmt.Errorf("npx not found: install Node.js to use skill discovery")
+		return m, nil
+	}
+
+	query := stackdetect.Detect(".")
+	if query == "" {
+		query = "developer tools"
+	}
+
+	m.skillDiscovery = skillDiscoveryState{
+		SubState: screens.SkillDiscoveryLoading,
+	}
+	m.setScreen(ScreenSkillDiscovery)
+
+	return m, SearchSkillsCmd(query)
+}
+
+// SearchSkillsCmd searches skills.sh for each keyword individually, merges and
+// deduplicates results by skillId, and returns them sorted by installs desc.
+// Searching per keyword instead of a combined query gives much better results.
+func SearchSkillsCmd(query string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		keywords := strings.Fields(query)
+		if len(keywords) == 0 {
+			keywords = []string{"developer tools"}
+		}
+
+		seen := make(map[string]struct{})
+		var merged []skillssh.SearchSkill
+
+		for _, kw := range keywords {
+			raw, err := skillssh.Search(ctx, kw)
+			if err != nil {
+				continue // skip failed keyword, try the rest
+			}
+			filtered := skillssh.Filter(raw)
+			for _, s := range filtered {
+				if _, exists := seen[s.ID]; !exists {
+					seen[s.ID] = struct{}{}
+					merged = append(merged, s)
+				}
+			}
+		}
+
+		// re-sort merged results by installs desc
+		sort.Slice(merged, func(i, j int) bool {
+			return merged[i].Installs > merged[j].Installs
+		})
+
+		const maxRecommended = 5
+		if len(merged) > maxRecommended {
+			merged = merged[:maxRecommended]
+		}
+
+		items := make([]screens.SkillDiscoveryItem, 0, len(merged))
+		for _, s := range merged {
+			items = append(items, screens.SkillDiscoveryItem{
+				Name:     s.Name,
+				SkillID:  s.SkillID,
+				Source:   s.Source,
+				Installs: s.Installs,
+			})
+		}
+
+		return skillsLoadedMsg{Skills: items}
+	}
+}
+
+// SearchManualCmd searches skills.sh for a single user-typed query, filters
+// results, and returns at most 3 items sorted by installs descending.
+func SearchManualCmd(query string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		raw, err := skillssh.Search(ctx, query)
+		if err != nil {
+			return manualSearchDoneMsg{Err: err}
+		}
+
+		filtered := skillssh.Filter(raw)
+
+		const maxResults = 10
+		if len(filtered) > maxResults {
+			filtered = filtered[:maxResults]
+		}
+
+		items := make([]screens.SkillDiscoveryItem, 0, len(filtered))
+		for _, s := range filtered {
+			items = append(items, screens.SkillDiscoveryItem{
+				Name:     s.Name,
+				SkillID:  s.SkillID,
+				Source:   s.Source,
+				Installs: s.Installs,
+			})
+		}
+
+		return manualSearchDoneMsg{Results: items}
+	}
+}
+
+// InstallSkillCmd runs `npx skills add <source>/<name>` and returns a
+// skillInstallDoneMsg when it finishes.
+func InstallSkillCmd(skill screens.SkillDiscoveryItem, index int) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+
+		skillID := skill.SkillID
+		if skillID == "" {
+			skillID = skill.Name
+		}
+		cmd := exec.CommandContext(ctx, "npx", "skills", "add", skill.Source+"@"+skillID, "-y")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			err = fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+		}
+		return skillInstallDoneMsg{Index: index, Err: err}
+	}
 }
 
 func componentsForPreset(preset model.PresetID) []model.ComponentID {
