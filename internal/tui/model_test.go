@@ -705,3 +705,67 @@ func TestSkillDiscoveryInstalling_KeysBlocked(t *testing.T) {
 		}
 	}
 }
+
+// TestLoading_EscReturnsToWelcome verifies that pressing ESC during the Loading
+// sub-state returns to the Welcome screen.
+func TestLoading_EscReturnsToWelcome(t *testing.T) {
+	m := NewModel(system.DetectionResult{}, "dev")
+	m.Screen = ScreenSkillDiscovery
+	m.skillDiscovery.SubState = screens.SkillDiscoveryLoading
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	state := updated.(Model)
+
+	if state.Screen != ScreenWelcome {
+		t.Fatalf("Screen = %v, want ScreenWelcome after ESC on Loading", state.Screen)
+	}
+}
+
+// TestBuildInstallArg_UsesSkillIDNotName verifies that buildInstallArg
+// produces source@skillId and does NOT use the display Name.
+func TestBuildInstallArg_UsesSkillIDNotName(t *testing.T) {
+	skill := screens.SkillDiscoveryItem{
+		Name:    "react:components",        // display name — has colon, should NOT appear
+		SkillID: "react-components",        // actual API skillId
+		Source:  "google-labs-code/stitch-skills",
+	}
+
+	got := buildInstallArg(skill)
+	want := "google-labs-code/stitch-skills@react-components"
+
+	if got != want {
+		t.Errorf("buildInstallArg = %q, want %q", got, want)
+	}
+}
+
+// TestBuildInstallArg_FallsBackToNameWhenSkillIDEmpty verifies that when SkillID
+// is empty (shouldn't happen in practice), Name is used as fallback.
+func TestBuildInstallArg_FallsBackToNameWhenSkillIDEmpty(t *testing.T) {
+	skill := screens.SkillDiscoveryItem{
+		Name:   "my-skill",
+		Source: "vercel-labs/agent-skills",
+	}
+
+	got := buildInstallArg(skill)
+	want := "vercel-labs/agent-skills@my-skill"
+
+	if got != want {
+		t.Errorf("buildInstallArg = %q, want %q", got, want)
+	}
+}
+
+// TestBuildInstallArg_NeverContainsDisplayNameColon verifies that a skill whose
+// Name contains ':' (broken git ref) is never passed as the install argument
+// when SkillID is present.
+func TestBuildInstallArg_NeverContainsDisplayNameColon(t *testing.T) {
+	skill := screens.SkillDiscoveryItem{
+		Name:    "namespace:thing",
+		SkillID: "namespace-thing",
+		Source:  "some-org/some-repo",
+	}
+
+	got := buildInstallArg(skill)
+	if got != "some-org/some-repo@namespace-thing" {
+		t.Errorf("buildInstallArg = %q — should use SkillID, not Name with colon", got)
+	}
+}

@@ -1041,18 +1041,24 @@ func SearchManualCmd(query string) tea.Cmd {
 	}
 }
 
-// InstallSkillCmd runs `npx skills add <source>/<name>` and returns a
+// buildInstallArg returns the `source@skillId` argument for `npx skills add`.
+// Falls back to Name when SkillID is empty (should not happen in practice).
+func buildInstallArg(skill screens.SkillDiscoveryItem) string {
+	skillID := skill.SkillID
+	if skillID == "" {
+		skillID = skill.Name
+	}
+	return skill.Source + "@" + skillID
+}
+
+// InstallSkillCmd runs `npx skills add <source>@<skillId> -y` and returns a
 // skillInstallDoneMsg when it finishes.
 func InstallSkillCmd(skill screens.SkillDiscoveryItem, index int) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
-		skillID := skill.SkillID
-		if skillID == "" {
-			skillID = skill.Name
-		}
-		cmd := exec.CommandContext(ctx, "npx", "skills", "add", skill.Source+"@"+skillID, "-y")
+		cmd := exec.CommandContext(ctx, "npx", "skills", "add", buildInstallArg(skill), "-y")
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			err = fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
