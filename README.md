@@ -290,9 +290,10 @@ gentle-ai install --dry-run \
 | macOS (Apple Silicon + Intel) | Homebrew | Supported |
 | Linux (Ubuntu/Debian) | apt | Supported |
 | Linux (Arch) | pacman | Supported |
+| Linux (Fedora/RHEL) | dnf | Supported |
 | Windows 10/11 | winget | Supported |
 
-Derivatives are detected via `ID_LIKE` in `/etc/os-release` (Linux Mint, Pop!_OS, Manjaro, EndeavourOS, etc.).
+Derivatives are detected via `ID_LIKE` in `/etc/os-release` (Linux Mint, Pop!_OS, Manjaro, EndeavourOS, CentOS, Rocky Linux, AlmaLinux, Nobara, etc.).
 
 Release binaries are built for `linux`, `darwin`, and `windows` on both `amd64` and `arm64`.
 
