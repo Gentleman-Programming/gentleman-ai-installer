@@ -7,7 +7,7 @@ import (
 )
 
 func WelcomeOptions() []string {
-	return []string{"Start installation", "Manage backups", "Quit"}
+	return []string{"Start installation", "Manage backups", "Discover skills", "Quit"}
 }
 
 func RenderWelcome(cursor int, version string, updateBanner string) string {
