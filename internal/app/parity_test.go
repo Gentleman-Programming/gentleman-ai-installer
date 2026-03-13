@@ -168,6 +168,30 @@ func TestRunArgsNoCommandLaunchesTUI(t *testing.T) {
 	}
 }
 
+func TestRunArgsHelpCommands(t *testing.T) {
+	helpArgs := [][]string{
+		{"help"},
+		{"--help"},
+		{"-h"},
+	}
+	for _, args := range helpArgs {
+		t.Run(args[0], func(t *testing.T) {
+			var buf bytes.Buffer
+			err := RunArgs(args, &buf)
+			if err != nil {
+				t.Fatalf("RunArgs(%v) unexpected error = %v", args, err)
+			}
+			out := buf.String()
+			if !strings.Contains(out, "gentle-ai") {
+				t.Fatalf("RunArgs(%v) output missing 'gentle-ai': %q", args, out)
+			}
+			if !strings.Contains(out, "install") {
+				t.Fatalf("RunArgs(%v) output missing 'install': %q", args, out)
+			}
+		})
+	}
+}
+
 func TestRunArgsUnknownCommandReturnsError(t *testing.T) {
 	var buf bytes.Buffer
 	err := RunArgs([]string{"bogus"}, &buf)

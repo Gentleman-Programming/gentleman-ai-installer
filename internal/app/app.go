@@ -72,6 +72,20 @@ func RunArgs(args []string, stdout io.Writer) error {
 		}
 
 		return nil
+	case "help", "--help", "-h":
+		_, _ = fmt.Fprintf(stdout, "gentle-ai %s\n\n", Version)
+		_, _ = fmt.Fprintln(stdout, "Usage:")
+		_, _ = fmt.Fprintln(stdout, "  gentle-ai [command]")
+		_, _ = fmt.Fprintln(stdout, "")
+		_, _ = fmt.Fprintln(stdout, "Available commands:")
+		_, _ = fmt.Fprintln(stdout, "  (no args)   Launch interactive TUI installer")
+		_, _ = fmt.Fprintln(stdout, "  install     Install agents and components non-interactively")
+		_, _ = fmt.Fprintln(stdout, "  update      Check for available updates")
+		_, _ = fmt.Fprintln(stdout, "  version     Print version")
+		_, _ = fmt.Fprintln(stdout, "  help        Show this help message")
+		_, _ = fmt.Fprintln(stdout, "")
+		_, _ = fmt.Fprintln(stdout, "Docs: https://github.com/Gentleman-Programming/gentle-ai")
+		return nil
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
