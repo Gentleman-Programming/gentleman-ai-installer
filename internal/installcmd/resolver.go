@@ -137,12 +137,15 @@ func resolveGGAInstall(profile system.PlatformProfile) (CommandSequence, error) 
 		// Clean up any leftover directory from a previous run before cloning.
 		// PowerShell is used for cleanup to avoid cmd.exe quoting issues with
 		// embedded double quotes in the "if exist ... rmdir" approach.
+		// After install.sh runs, create gga.ps1 so PowerShell users can invoke
+		// gga directly — PowerShell cannot execute files without a known extension.
 		cloneDst := filepath.Join(os.TempDir(), "gentleman-guardian-angel")
 		bash := gitBashPath()
 		return CommandSequence{
 			{"powershell", "-NoProfile", "-Command", fmt.Sprintf("Remove-Item -Recurse -Force -ErrorAction SilentlyContinue '%s'; exit 0", cloneDst)},
 			{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", cloneDst},
 			{bash, bashScriptPath(profile, filepath.Join(cloneDst, "install.sh"))},
+			{"powershell", "-NoProfile", "-Command", ggaPs1WrapperCommand(bash)},
 		}, nil
 	default:
 		return nil, fmt.Errorf(
@@ -150,6 +153,14 @@ func resolveGGAInstall(profile system.PlatformProfile) (CommandSequence, error) 
 			profile.OS, profile.LinuxDistro, profile.PackageManager,
 		)
 	}
+}
+
+// ggaPs1WrapperCommand returns the PowerShell command that creates gga.ps1 in
+// ~/.local/bin/. The wrapper delegates execution to Git Bash so PowerShell
+// users can invoke `gga` directly without manually launching Git Bash.
+func ggaPs1WrapperCommand(bash string) string {
+	ps1Line := fmt.Sprintf(`& "%s" "$env:USERPROFILE\.local\bin\gga" @args`, bash)
+	return fmt.Sprintf(`Set-Content -Path "$env:USERPROFILE\.local\bin\gga.ps1" -Value '%s' -Encoding UTF8`, ps1Line)
 }
 
 func bashScriptPath(profile system.PlatformProfile, path string) string {

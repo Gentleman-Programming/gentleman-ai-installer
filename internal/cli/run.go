@@ -520,7 +520,11 @@ func ggaAvailable(_ system.PlatformProfile) bool {
 	if err != nil {
 		return false
 	}
-	_, err = osStat(filepath.Join(homeDir, ".local", "bin", "gga"))
+	if _, err = osStat(filepath.Join(homeDir, ".local", "bin", "gga")); err == nil {
+		return true
+	}
+	// On Windows, install creates gga.ps1 so PowerShell can invoke gga directly.
+	_, err = osStat(filepath.Join(homeDir, ".local", "bin", "gga.ps1"))
 	return err == nil
 }
 
