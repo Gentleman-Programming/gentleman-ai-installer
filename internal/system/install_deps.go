@@ -77,6 +77,20 @@ func installHintGo(profile PlatformProfile) string {
 	}
 }
 
+// installHintEngram returns the platform-specific install hint for Engram.
+func installHintEngram(profile PlatformProfile) string {
+	switch {
+	case profile.OS == "darwin":
+		return "brew tap Gentleman-Programming/homebrew-tap && brew install engram"
+	case profile.OS == "windows":
+		return "go install github.com/Gentleman-Programming/engram/cmd/engram@latest"
+	case profile.PackageManager == "apt", profile.PackageManager == "pacman":
+		return "go install github.com/Gentleman-Programming/engram/cmd/engram@latest"
+	default:
+		return "go install github.com/Gentleman-Programming/engram/cmd/engram@latest"
+	}
+}
+
 // InstallCommandsForDep returns the command sequence to install a missing dependency.
 // Returns nil if no automatic install is available.
 func InstallCommandsForDep(name string, profile PlatformProfile) [][]string {
@@ -94,6 +108,8 @@ func InstallCommandsForDep(name string, profile PlatformProfile) [][]string {
 		return installCommandsBrew(profile)
 	case "go":
 		return installCommandsGo(profile)
+	case "engram":
+		return installCommandsEngram(profile)
 	default:
 		return nil
 	}
@@ -168,6 +184,22 @@ func installCommandsGo(profile PlatformProfile) [][]string {
 		return [][]string{{"sudo", "apt-get", "install", "-y", "golang"}}
 	case profile.PackageManager == "pacman":
 		return [][]string{{"sudo", "pacman", "-S", "--noconfirm", "go"}}
+	default:
+		return nil
+	}
+}
+
+func installCommandsEngram(profile PlatformProfile) [][]string {
+	switch {
+	case profile.OS == "darwin":
+		return [][]string{
+			{"brew", "tap", "Gentleman-Programming/homebrew-tap"},
+			{"brew", "install", "engram"},
+		}
+	case profile.OS == "windows", profile.PackageManager == "apt", profile.PackageManager == "pacman":
+		// Engram requires Go to be installed first on these platforms.
+		// The install will fail gracefully if Go is not present.
+		return [][]string{{"go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}}
 	default:
 		return nil
 	}

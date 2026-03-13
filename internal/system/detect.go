@@ -48,7 +48,7 @@ func Detect(ctx context.Context) (DetectionResult, error) {
 		return DetectionResult{}, err
 	}
 
-	tools := DetectTools(ctx, []string{"git", "curl", "brew", "node"})
+	tools := DetectTools(ctx, []string{"git", "curl", "brew", "node", "engram"})
 	configs := ScanConfigs(homeDir)
 	osReleaseContent, _ := osReleaseContent(runtime.GOOS)
 

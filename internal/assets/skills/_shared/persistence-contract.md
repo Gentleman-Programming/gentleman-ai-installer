@@ -1,5 +1,9 @@
 # Persistence Contract (shared across all SDD skills)
 
+> **IMPORTANT**: `mem_search`, `mem_save`, `mem_get_observation`, `mem_update`, etc. are **AGENT FUNCTIONS**, NOT bash commands.
+> Do NOT try to run them in a terminal. They are called directly by the AI agent through the Engram MCP server.
+> These functions are available automatically when Engram is configured as an MCP server for your agent.
+
 ## Mode Resolution
 
 The orchestrator passes `artifact_store.mode` with one of: `engram | openspec | hybrid | none`.

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/internal/model"
@@ -333,5 +334,94 @@ func TestResolveComponentInstall(t *testing.T) {
 				t.Fatalf("ResolveComponentInstall() = %v, want %v", command, tt.want)
 			}
 		})
+	}
+}
+
+func TestResolveEngramInstallFailsWhenGoMissing(t *testing.T) {
+	orig := cmdLookPath
+	cmdLookPath = func(file string) (string, error) {
+		if file == "go" {
+			return "", fmt.Errorf("not found")
+		}
+		return file, nil
+	}
+	t.Cleanup(func() { cmdLookPath = orig })
+
+	r := NewResolver()
+	for _, pm := range []string{"apt", "pacman", "winget"} {
+		profile := system.PlatformProfile{OS: "linux", PackageManager: pm}
+		if pm == "winget" {
+			profile.OS = "windows"
+		}
+		_, err := r.ResolveComponentInstall(profile, model.ComponentEngram)
+		if err == nil {
+			t.Fatalf("ResolveComponentInstall(engram, pm=%s) expected error when go missing, got nil", pm)
+		}
+		if !strings.Contains(err.Error(), "Go") {
+			t.Fatalf("ResolveComponentInstall(engram, pm=%s) error = %q, want it to mention 'Go'", pm, err.Error())
+		}
+	}
+}
+
+func TestResolveEngramInstallFailsWhenGO111MODULEOff(t *testing.T) {
+	origLookPath := cmdLookPath
+	cmdLookPath = func(file string) (string, error) { return file, nil }
+	t.Cleanup(func() { cmdLookPath = origLookPath })
+
+	origGetenv := osGetenv
+	osGetenv = func(key string) string {
+		if key == "GO111MODULE" {
+			return "off"
+		}
+		return ""
+	}
+	t.Cleanup(func() { osGetenv = origGetenv })
+
+	r := NewResolver()
+	for _, pm := range []string{"apt", "pacman", "winget"} {
+		profile := system.PlatformProfile{OS: "linux", PackageManager: pm}
+		if pm == "winget" {
+			profile.OS = "windows"
+		}
+		_, err := r.ResolveComponentInstall(profile, model.ComponentEngram)
+		if err == nil {
+			t.Fatalf("ResolveComponentInstall(engram, pm=%s) expected error when GO111MODULE=off, got nil", pm)
+		}
+		if !strings.Contains(err.Error(), "GO111MODULE") {
+			t.Fatalf("ResolveComponentInstall(engram, pm=%s) error = %q, want it to mention 'GO111MODULE'", pm, err.Error())
+		}
+		// Verify platform-specific fix command in the error message.
+		if pm == "winget" {
+			if !strings.Contains(err.Error(), "$env:") {
+				t.Fatalf("ResolveComponentInstall(engram, pm=%s) error = %q, want PowerShell fix ($env:)", pm, err.Error())
+			}
+		} else {
+			if !strings.Contains(err.Error(), "export") {
+				t.Fatalf("ResolveComponentInstall(engram, pm=%s) error = %q, want bash fix (export)", pm, err.Error())
+			}
+		}
+	}
+}
+
+func TestResolveEngramBrewBypassesGoValidation(t *testing.T) {
+	// macOS brew installs Engram as a binary — Go is not needed.
+	// Even when Go is absent, the install command should resolve successfully.
+	orig := cmdLookPath
+	cmdLookPath = func(file string) (string, error) {
+		if file == "go" {
+			return "", fmt.Errorf("not found")
+		}
+		return file, nil
+	}
+	t.Cleanup(func() { cmdLookPath = orig })
+
+	r := NewResolver()
+	profile := system.PlatformProfile{OS: "darwin", PackageManager: "brew"}
+	cmd, err := r.ResolveComponentInstall(profile, model.ComponentEngram)
+	if err != nil {
+		t.Fatalf("ResolveComponentInstall(engram, brew) unexpected error when go missing: %v", err)
+	}
+	if len(cmd) == 0 {
+		t.Fatal("ResolveComponentInstall(engram, brew) returned empty CommandSequence")
 	}
 }

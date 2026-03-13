@@ -11,9 +11,10 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
 
-// cmdLookPath and osStat are package-level vars for testability.
+// cmdLookPath, osStat, and osGetenv are package-level vars for testability.
 var cmdLookPath = exec.LookPath
 var osStat = os.Stat
+var osGetenv = os.Getenv
 
 // CommandSequence represents an ordered list of commands to run in sequence.
 // Each inner slice is a single command with its arguments (e.g., ["brew", "install", "engram"]).
@@ -207,6 +208,24 @@ func gitBashPath() string {
 	return "bash"
 }
 
+// validateGoForModuleInstall checks that Go is present and module mode is enabled.
+// Returns a descriptive, actionable error if either condition is not met.
+// brew installs do not need Go, so this must only be called for non-brew platforms.
+func validateGoForModuleInstall(profile system.PlatformProfile) error {
+	if _, err := cmdLookPath("go"); err != nil {
+		return fmt.Errorf("Go 1.24+ is required to install Engram but was not found.\n" +
+			"Please install Go from https://go.dev/dl/ and restart your terminal.")
+	}
+	if osGetenv("GO111MODULE") == "off" {
+		fix := "export GO111MODULE=on  (or unset GO111MODULE)"
+		if profile.OS == "windows" {
+			fix = `$env:GO111MODULE = "on"  (PowerShell) or set GO111MODULE=on (cmd)`
+		}
+		return fmt.Errorf("Go modules are disabled (GO111MODULE=off).\nRun: %s and retry.", fix)
+	}
+	return nil
+}
+
 // resolveEngramInstall returns the correct install command sequence for Engram per platform.
 // - darwin: brew tap + brew install (via Gentleman-Programming/homebrew-tap)
 // - linux: go install (engram is not in any Linux distro's repos)
@@ -218,9 +237,15 @@ func resolveEngramInstall(profile system.PlatformProfile) (CommandSequence, erro
 			{"brew", "install", "engram"},
 		}, nil
 	case "apt", "pacman":
+		if err := validateGoForModuleInstall(profile); err != nil {
+			return nil, err
+		}
 		return CommandSequence{{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}}, nil
 	case "winget":
 		// On Windows, use go install (Engram has no winget package yet).
+		if err := validateGoForModuleInstall(profile); err != nil {
+			return nil, err
+		}
 		return CommandSequence{{"go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}}, nil
 	default:
 		return nil, fmt.Errorf(

@@ -84,6 +84,14 @@ func defineDependencies(profile PlatformProfile) []Dependency {
 		InstallHint: installHintGo(profile),
 	})
 
+	// engram is optional but recommended for SDD workflows.
+	deps = append(deps, Dependency{
+		Name:        "engram",
+		Required:    false,
+		DetectCmd:   []string{"engram", "version"},
+		InstallHint: installHintEngram(profile),
+	})
+
 	return deps
 }
 
