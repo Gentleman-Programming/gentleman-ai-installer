@@ -228,9 +228,24 @@ install_go() {
         gobin="$(go env GOPATH)/bin"
     fi
 
-    if [[ ":$PATH:" != *":$gobin:"* ]]; then
-        warn "${gobin} is not in your PATH"
-        warn "Add this to your shell profile: export PATH=\"\$PATH:${gobin}\""
+    # Show where binary was installed
+    info "Binary installed in: ${gobin}/${BINARY_NAME}"
+
+    if [[ ":$PATH:" == *":$gobin:"* ]]; then
+        success "${gobin} is in your PATH"
+        info "Run '${BINARY_NAME}' to get started"
+    else
+        warn ""
+        warn "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        warn "  ⚠️  ${gobin} is not in your PATH"
+        warn "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        warn ""
+        warn "The binary was installed in: ${gobin}/${BINARY_NAME}"
+        warn "To use '${BINARY_NAME}' command, add this to your shell profile:"
+        echo -e "  ${GREEN}export PATH=\"\$PATH:${gobin}\"${NC}"
+        warn ""
+        warn "Then restart your terminal or run: source ~/.bashrc"
+        warn ""
     fi
 
     success "Installed ${BINARY_NAME} via go install"
@@ -282,6 +297,9 @@ install_binary() {
     # Create temp directory — clean up on exit
     local tmpdir
     tmpdir="$(mktemp -d)"
+    if [ -z "$tmpdir" ] || [ ! -d "$tmpdir" ]; then
+        fatal "Failed to create temporary directory (mktemp -d returned empty or invalid path)"
+    fi
     trap 'rm -rf "$tmpdir"' EXIT
 
     # Download archive

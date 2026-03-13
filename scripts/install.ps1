@@ -144,9 +144,24 @@ function Install-ViaGo {
         $gobin = Join-Path $gopath "bin"
     }
 
-    if ($env:PATH -notlike "*$gobin*") {
-        Write-Warn "$gobin is not in your PATH"
-        Write-Warn "Add it to your PATH environment variable."
+    # Show where binary was installed
+    Write-Info "Binary installed in: $gobin\$BINARY_NAME.exe"
+
+    if ($env:PATH -like "*$gobin*") {
+        Write-Success "$gobin is in your PATH"
+        Write-Info "Run '$BINARY_NAME' to get started"
+    } else {
+        Write-Warn ""
+        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Yellow
+        Write-Host "  ⚠️  $gobin is not in your PATH" -ForegroundColor Yellow
+        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Yellow
+        Write-Warn ""
+        Write-Host "The binary was installed in: $gobin\$BINARY_NAME.exe" -ForegroundColor White
+        Write-Host "To use '$BINARY_NAME' command, run:" -ForegroundColor White
+        Write-Host "  [Environment]::SetEnvironmentVariable('PATH', `$env:PATH + ';$gobin', 'User')" -ForegroundColor Green
+        Write-Warn ""
+        Write-Host "Or restart your terminal to apply PATH changes." -ForegroundColor DarkGray
+        Write-Warn ""
     }
 
     Write-Success "Installed $BINARY_NAME via go install"

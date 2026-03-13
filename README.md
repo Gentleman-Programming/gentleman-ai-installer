@@ -105,6 +105,10 @@ brew install gentle-ai
 go install github.com/gentleman-programming/gentle-ai/cmd/gentle-ai@latest
 ```
 
+> **Note**: By default, Go installs binaries to `~/go/bin`. Make sure this directory is in your PATH:
+> - **Linux/macOS**: `export PATH=$PATH:~/go/bin`
+> - **Windows**: Add `%USERPROFILE%\go\bin` to your PATH
+
 ### Windows (PowerShell)
 
 ```powershell
