@@ -26,15 +26,21 @@ Read and follow `skills/_shared/persistence-contract.md` for mode resolution rul
 
 - If mode is `engram`:
 
-  **Read dependencies** (two-step — search returns truncated previews):
-  1. `mem_search(query: "sdd/{change-name}/proposal", project: "{project}")` → get ID
-  2. `mem_get_observation(id: {id})` → full proposal
-  3. `mem_search(query: "sdd/{change-name}/spec", project: "{project}")` → get ID
-  4. `mem_get_observation(id: {id})` → full spec
-  5. `mem_search(query: "sdd/{change-name}/design", project: "{project}")` → get ID
-  6. `mem_get_observation(id: {id})` → full design
-  7. `mem_search(query: "sdd/{change-name}/tasks", project: "{project}")` → get ID (save this ID for updates)
-  8. `mem_get_observation(id: {id})` → full tasks
+  **CRITICAL: `mem_search` returns 300-char PREVIEWS, not full content. You MUST call `mem_get_observation(id)` for EVERY artifact. If you skip this, you will work with incomplete specs and produce wrong code.**
+
+  **STEP A — SEARCH** (get IDs only — content is truncated):
+  1. `mem_search(query: "sdd/{change-name}/proposal", project: "{project}")` → save ID
+  2. `mem_search(query: "sdd/{change-name}/spec", project: "{project}")` → save ID
+  3. `mem_search(query: "sdd/{change-name}/design", project: "{project}")` → save ID
+  4. `mem_search(query: "sdd/{change-name}/tasks", project: "{project}")` → save ID (keep this ID for updates)
+
+  **STEP B — RETRIEVE FULL CONTENT** (mandatory for each):
+  5. `mem_get_observation(id: {proposal_id})` → full proposal
+  6. `mem_get_observation(id: {spec_id})` → full spec
+  7. `mem_get_observation(id: {design_id})` → full design
+  8. `mem_get_observation(id: {tasks_id})` → full tasks
+
+  **DO NOT use search previews as source material.**
 
   **Mark tasks complete** (update the tasks artifact as you go):
   ```

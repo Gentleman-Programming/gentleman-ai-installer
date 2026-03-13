@@ -25,11 +25,17 @@ Read and follow `skills/_shared/persistence-contract.md` for mode resolution rul
 
 - If mode is `engram`:
 
-  **Read dependencies** (two-step — search returns truncated previews):
-  1. `mem_search(query: "sdd/{change-name}/proposal", project: "{project}")` → get observation ID
-  2. `mem_get_observation(id: {id from step 1})` → full proposal content (REQUIRED)
-  3. `mem_search(query: "sdd/{change-name}/spec", project: "{project}")` → get observation ID (optional — may not exist if running in parallel with sdd-spec)
-  4. If found: `mem_get_observation(id: {id from step 3})` → full spec content
+  **CRITICAL: `mem_search` returns 300-char PREVIEWS, not full content. You MUST call `mem_get_observation(id)` for EVERY artifact. If you skip this, you will work with incomplete data and produce wrong design.**
+
+  **STEP A — SEARCH** (get IDs only — content is truncated):
+  1. `mem_search(query: "sdd/{change-name}/proposal", project: "{project}")` → save ID
+  2. `mem_search(query: "sdd/{change-name}/spec", project: "{project}")` → save ID (optional — may not exist if running in parallel with sdd-spec)
+
+  **STEP B — RETRIEVE FULL CONTENT** (mandatory for each found):
+  3. `mem_get_observation(id: {proposal_id})` → full proposal content (REQUIRED)
+  4. If spec found: `mem_get_observation(id: {spec_id})` → full spec content
+
+  **DO NOT use search previews as source material.**
 
   **Save your artifact**:
   ```

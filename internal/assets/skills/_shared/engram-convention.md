@@ -58,32 +58,36 @@ mem_save(
 )
 ```
 
-## Recovery Protocol (2 steps — MANDATORY)
+## Recovery Protocol (2 steps)
 
-To retrieve an artifact, ALWAYS use this two-step process:
+To retrieve an artifact, use this two-step process:
 
 ```
 Step 1: Search by topic_key pattern
   mem_search(query: "sdd/{change-name}/{artifact-type}", project: "{project}")
-  → Returns a truncated preview with an observation ID
+  → Returns a truncated preview (300 chars) with an observation ID
 
-Step 2: Get full content (REQUIRED)
+Step 2: Get full content (when you need the complete artifact)
   mem_get_observation(id: {observation-id from step 1})
   → Returns complete, untruncated content
 ```
 
-NEVER use `mem_search` results directly as the full artifact — they are truncated previews.
-ALWAYS call `mem_get_observation` to get the complete content.
+The preview from `mem_search` is useful for identifying whether the result is what you're looking for. When you need the full content (e.g., reading SDD dependencies), ALWAYS call `mem_get_observation`.
 
 ### Retrieving Multiple Artifacts
 
-When a skill needs multiple artifacts (e.g., sdd-tasks needs proposal + spec + design):
+When a skill needs multiple artifacts as required dependencies (e.g., sdd-tasks needs proposal + spec + design), group all searches first, then all retrievals:
 
 ```
-1. mem_search(query: "sdd/{change-name}/proposal", project: "{project}") → get ID
-2. mem_search(query: "sdd/{change-name}/spec", project: "{project}") → get ID
-3. mem_search(query: "sdd/{change-name}/design", project: "{project}") → get ID
-4. mem_get_observation(id) for EACH → full content
+STEP A — SEARCH (get IDs only — content is truncated):
+  1. mem_search(query: "sdd/{change-name}/proposal", project: "{project}") → save ID
+  2. mem_search(query: "sdd/{change-name}/spec", project: "{project}") → save ID
+  3. mem_search(query: "sdd/{change-name}/design", project: "{project}") → save ID
+
+STEP B — RETRIEVE FULL CONTENT (mandatory for required dependencies):
+  4. mem_get_observation(id: {proposal_id}) → full proposal
+  5. mem_get_observation(id: {spec_id}) → full spec
+  6. mem_get_observation(id: {design_id}) → full design
 ```
 
 ### Loading Project Context

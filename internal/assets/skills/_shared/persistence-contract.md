@@ -89,9 +89,9 @@ persistent knowledge across sessions.
 **SDD (with dependencies)**:
 ```
 Artifact store mode: {engram|openspec|hybrid|none}
-Read these artifacts before starting (two-step — search results are TRUNCATED):
+Read these artifacts before starting (two-step — search returns truncated previews):
   mem_search(query: "sdd/{change-name}/{type}", project: "{project}") → get ID
-  mem_get_observation(id: {id}) → full content (REQUIRED)
+  mem_get_observation(id: {id}) → full content (REQUIRED for SDD dependencies)
 
 PERSISTENCE (MANDATORY — do NOT skip):
 After completing your work, you MUST call:

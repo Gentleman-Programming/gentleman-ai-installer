@@ -25,17 +25,23 @@ Read and follow `skills/_shared/persistence-contract.md` for mode resolution rul
 
 - If mode is `engram`:
 
-  **Read ALL artifacts** (two-step for each — search returns truncated previews):
-  1. `mem_search(query: "sdd/{change-name}/proposal", project: "{project}")` → get ID
-  2. `mem_get_observation(id: {id})` → full proposal
-  3. `mem_search(query: "sdd/{change-name}/spec", project: "{project}")` → get ID
-  4. `mem_get_observation(id: {id})` → full spec
-  5. `mem_search(query: "sdd/{change-name}/design", project: "{project}")` → get ID
-  6. `mem_get_observation(id: {id})` → full design
-  7. `mem_search(query: "sdd/{change-name}/tasks", project: "{project}")` → get ID
-  8. `mem_get_observation(id: {id})` → full tasks
-  9. `mem_search(query: "sdd/{change-name}/verify-report", project: "{project}")` → get ID
-  10. `mem_get_observation(id: {id})` → full verification report
+  **CRITICAL: `mem_search` returns 300-char PREVIEWS, not full content. You MUST call `mem_get_observation(id)` for EVERY artifact. If you skip this, you will archive with incomplete data.**
+
+  **STEP A — SEARCH** (get IDs only — content is truncated):
+  1. `mem_search(query: "sdd/{change-name}/proposal", project: "{project}")` → save ID
+  2. `mem_search(query: "sdd/{change-name}/spec", project: "{project}")` → save ID
+  3. `mem_search(query: "sdd/{change-name}/design", project: "{project}")` → save ID
+  4. `mem_search(query: "sdd/{change-name}/tasks", project: "{project}")` → save ID
+  5. `mem_search(query: "sdd/{change-name}/verify-report", project: "{project}")` → save ID
+
+  **STEP B — RETRIEVE FULL CONTENT** (mandatory for each):
+  6. `mem_get_observation(id: {proposal_id})` → full proposal
+  7. `mem_get_observation(id: {spec_id})` → full spec
+  8. `mem_get_observation(id: {design_id})` → full design
+  9. `mem_get_observation(id: {tasks_id})` → full tasks
+  10. `mem_get_observation(id: {verify_report_id})` → full verification report
+
+  **DO NOT use search previews as source material.**
 
   **Record all observation IDs** — include them in the archive report for full traceability.
 
