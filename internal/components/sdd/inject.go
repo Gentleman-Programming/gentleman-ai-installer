@@ -29,6 +29,21 @@ func overlayAssetPath(sddMode model.SDDModeID) string {
 	return "opencode/sdd-overlay-single.json"
 }
 
+// commandsAssetDir returns the embedded asset directory for slash commands
+// based on the agent ID. Each agent has its own command format (different
+// frontmatter fields, skill path references). Returns "" if the agent has
+// no embedded command assets.
+func commandsAssetDir(agentID model.AgentID) string {
+	switch agentID {
+	case model.AgentClaudeCode:
+		return "claude/commands"
+	case model.AgentOpenCode:
+		return "opencode/commands"
+	default:
+		return ""
+	}
+}
+
 func Inject(homeDir string, adapter agents.Adapter, sddMode model.SDDModeID, modelAssignments ...map[string]model.ModelAssignment) (InjectionResult, error) {
 	if !adapter.SupportsSystemPrompt() {
 		return InjectionResult{}, nil
@@ -64,10 +79,11 @@ func Inject(homeDir string, adapter agents.Adapter, sddMode model.SDDModeID, mod
 	// 2. Write slash commands (if the agent supports them).
 	if adapter.SupportsSlashCommands() {
 		commandsDir := adapter.CommandsDir(homeDir)
-		if commandsDir != "" {
-			commandEntries, err := fs.ReadDir(assets.FS, "opencode/commands")
+		assetDir := commandsAssetDir(adapter.Agent())
+		if commandsDir != "" && assetDir != "" {
+			commandEntries, err := fs.ReadDir(assets.FS, assetDir)
 			if err != nil {
-				return InjectionResult{}, fmt.Errorf("read embedded opencode/commands: %w", err)
+				return InjectionResult{}, fmt.Errorf("read embedded %s: %w", assetDir, err)
 			}
 
 			for _, entry := range commandEntries {
@@ -75,7 +91,7 @@ func Inject(homeDir string, adapter agents.Adapter, sddMode model.SDDModeID, mod
 					continue
 				}
 
-				content := assets.MustRead("opencode/commands/" + entry.Name())
+				content := assets.MustRead(assetDir + "/" + entry.Name())
 				path := filepath.Join(commandsDir, entry.Name())
 				writeResult, err := filemerge.WriteFileAtomic(path, []byte(content), 0o644)
 				if err != nil {

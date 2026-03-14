@@ -125,11 +125,11 @@ func (a *Adapter) OutputStyleDir(homeDir string) string {
 }
 
 func (a *Adapter) SupportsSlashCommands() bool {
-	return false
+	return true
 }
 
-func (a *Adapter) CommandsDir(_ string) string {
-	return ""
+func (a *Adapter) CommandsDir(homeDir string) string {
+	return filepath.Join(homeDir, ".claude", "commands")
 }
 
 func (a *Adapter) SupportsSkills() bool {

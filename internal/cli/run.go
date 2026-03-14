@@ -665,8 +665,8 @@ func componentPaths(homeDir string, selection model.Selection, adapters []agents
 				paths = append(paths, adapter.SystemPromptFile(homeDir))
 			}
 			if adapter.SupportsSlashCommands() {
-				for _, command := range sdd.OpenCodeCommands() {
-					paths = append(paths, filepath.Join(adapter.CommandsDir(homeDir), command.Name+".md"))
+				for _, name := range sdd.SDDCommandNamesForAgent(adapter.Agent()) {
+					paths = append(paths, filepath.Join(adapter.CommandsDir(homeDir), name+".md"))
 				}
 			}
 			if adapter.Agent() == model.AgentOpenCode {
