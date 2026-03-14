@@ -126,10 +126,10 @@ Each SDD phase has explicit read/write rules based on the dependency graph:
 | `sdd-explore` | Nothing | Yes (`explore`) |
 | `sdd-propose` | Exploration (if exists, optional) | Yes (`proposal`) |
 | `sdd-spec` | Proposal (required) | Yes (`spec`) |
-| `sdd-design` | Proposal (required) | Yes (`design`) |
-| `sdd-tasks` | Spec + Design (required) | Yes (`tasks`) |
-| `sdd-apply` | Tasks + Spec + Design | Yes (`apply-progress`) |
-| `sdd-verify` | Spec + Tasks | Yes (`verify-report`) |
+| `sdd-design` | Proposal (required), Spec (optional) | Yes (`design`) |
+| `sdd-tasks` | Proposal + Spec + Design (required) | Yes (`tasks`) |
+| `sdd-apply` | Proposal + Spec + Design + Tasks | Yes (`apply-progress`) |
+| `sdd-verify` | Proposal + Spec + Design + Tasks | Yes (`verify-report`) |
 | `sdd-archive` | All artifacts | Yes (`archive-report`) |
 
 For SDD phases with required dependencies, the sub-agent reads them directly from the backend (engram or openspec) — the orchestrator passes artifact references (topic keys or file paths), NOT the content itself.
