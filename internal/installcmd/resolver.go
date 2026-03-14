@@ -5,15 +5,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gentleman-programming/gentle-ai/internal/model"
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
 
-// cmdLookPath and osStat are package-level vars for testability.
+// cmdLookPath, osStat, osGetenv, and cmdGoVersion are package-level vars for testability.
 var cmdLookPath = exec.LookPath
 var osStat = os.Stat
+var osGetenv = os.Getenv
+var cmdGoVersion = func() ([]byte, error) {
+	return exec.Command("go", "version").Output()
+}
 
 // CommandSequence represents an ordered list of commands to run in sequence.
 // Each inner slice is a single command with its arguments (e.g., ["brew", "install", "engram"]).
@@ -207,19 +212,70 @@ func gitBashPath() string {
 	return "bash"
 }
 
+// validateGoForModuleInstall checks that Go ≥1.24 is installed and GO111MODULE is not
+// disabled before attempting `go install`. Returns an actionable error if any check fails.
+// MUST NOT be called for brew-based installs (brew manages Go transitively).
+func validateGoForModuleInstall(profile system.PlatformProfile) error {
+	if _, err := cmdLookPath("go"); err != nil {
+		return fmt.Errorf(
+			"Go 1.24+ is required to install Engram but was not found in PATH.\n" +
+				"Please install Go from https://go.dev/dl/ and restart your terminal.")
+	}
+
+	out, err := cmdGoVersion()
+	if err != nil {
+		return fmt.Errorf(
+			"Go 1.24+ is required but could not verify the installed version.\n" +
+				"Please ensure Go is properly installed: https://go.dev/dl/")
+	}
+
+	// Parse "go version go1.XX.Y platform/arch"
+	parts := strings.Fields(string(out))
+	if len(parts) >= 3 {
+		versionStr := strings.TrimPrefix(parts[2], "go")
+		versionParts := strings.SplitN(versionStr, ".", 3)
+		if len(versionParts) >= 2 {
+			major, _ := strconv.Atoi(versionParts[0])
+			minor, _ := strconv.Atoi(versionParts[1])
+			if major < 1 || (major == 1 && minor < 24) {
+				return fmt.Errorf(
+					"Go 1.24+ is required to install Engram, but found go%s.\n"+
+						"Please update Go: https://go.dev/dl/", versionStr)
+			}
+		}
+	}
+
+	if osGetenv("GO111MODULE") == "off" {
+		fix := "export GO111MODULE=on  # then retry"
+		if profile.OS == "windows" {
+			fix = `$env:GO111MODULE = "on"  # PowerShell, then retry`
+		}
+		return fmt.Errorf("Go modules are disabled (GO111MODULE=off).\nRun: %s", fix)
+	}
+
+	return nil
+}
+
 // resolveEngramInstall returns the correct install command sequence for Engram per platform.
 // - darwin: brew tap + brew install (via Gentleman-Programming/homebrew-tap)
-// - linux: go install (engram is not in any Linux distro's repos)
+// - linux/windows: go install (engram is not in any distro repo or winget)
 func resolveEngramInstall(profile system.PlatformProfile) (CommandSequence, error) {
 	switch profile.PackageManager {
 	case "brew":
+		// macOS: brew manages Go transitively — no preflight needed.
 		return CommandSequence{
 			{"brew", "tap", "Gentleman-Programming/homebrew-tap"},
 			{"brew", "install", "engram"},
 		}, nil
 	case "apt", "pacman":
+		if err := validateGoForModuleInstall(profile); err != nil {
+			return nil, err
+		}
 		return CommandSequence{{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}}, nil
 	case "winget":
+		if err := validateGoForModuleInstall(profile); err != nil {
+			return nil, err
+		}
 		// On Windows, use go install (Engram has no winget package yet).
 		return CommandSequence{{"go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}}, nil
 	default:
