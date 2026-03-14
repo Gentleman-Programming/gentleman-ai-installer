@@ -9,7 +9,7 @@ import (
 )
 
 func AgentOptions() []model.AgentID {
-	agents := catalog.MVPAgents()
+	agents := catalog.AllAgents()
 	ids := make([]model.AgentID, 0, len(agents))
 	for _, agent := range agents {
 		ids = append(ids, agent.ID)

@@ -17,29 +17,70 @@ You are a sub-agent responsible for writing SPECIFICATIONS. You take the proposa
 
 From the orchestrator:
 - Change name
-- Artifact store mode (`engram | openspec | none`)
+- Artifact store mode (`engram | openspec | hybrid | none`)
 
 ## Execution and Persistence Contract
 
 Read and follow `skills/_shared/persistence-contract.md` for mode resolution rules.
 
-- If mode is `engram`: Read and follow `skills/_shared/engram-convention.md`. Artifact type: `spec`. Retrieve `proposal` as dependency. If specs span multiple domains, concatenate into a single artifact with domain headers.
+- If mode is `engram`:
+
+  **CRITICAL: `mem_search` returns 300-char PREVIEWS, not full content. You MUST call `mem_get_observation(id)` for EVERY artifact. If you skip this, you will work with incomplete data and produce wrong specs.**
+
+  **STEP A — SEARCH** (get IDs only — content is truncated):
+  1. `mem_search(query: "sdd/{change-name}/proposal", project: "{project}")` → save ID
+
+  **STEP B — RETRIEVE FULL CONTENT** (mandatory):
+  2. `mem_get_observation(id: {proposal_id})` → full proposal content (REQUIRED)
+
+  **DO NOT use search previews as source material.**
+
+  If specs span multiple domains, concatenate into a single artifact with domain headers.
+
+  **Save your artifact**:
+  ```
+  mem_save(
+    title: "sdd/{change-name}/spec",
+    topic_key: "sdd/{change-name}/spec",
+    type: "architecture",
+    project: "{project}",
+    content: "{your full spec markdown — all domains concatenated}"
+  )
+  ```
+  `topic_key` enables upserts — saving again updates, not duplicates.
+
+  (See `skills/_shared/engram-convention.md` for full naming conventions.)
 - If mode is `openspec`: Read and follow `skills/_shared/openspec-convention.md`.
+- If mode is `hybrid`: Follow BOTH conventions — persist to Engram (single concatenated artifact) AND write domain files to filesystem.
 - If mode is `none`: Return result only. Never create or modify project files.
 
 ## What to Do
 
-### Step 1: Identify Affected Domains
+### Step 1: Load Skill Registry
+
+**Do this FIRST, before any other work.**
+
+1. Try engram first: `mem_search(query: "skill-registry", project: "{project}")` → if found, `mem_get_observation(id)` for the full registry
+2. If engram not available or not found: read `.atl/skill-registry.md` from the project root
+3. If neither exists: proceed without skills (not an error)
+
+From the registry, identify and read any skills whose triggers match your task. Also read any project convention files listed in the registry.
+
+### Step 2: Identify Affected Domains
 
 From the proposal's "Affected Areas", determine which spec domains are touched. Group changes by domain (e.g., `auth/`, `payments/`, `ui/`).
 
-### Step 2: Read Existing Specs
+### Step 3: Read Existing Specs
 
-If `openspec/specs/{domain}/spec.md` exists, read it to understand CURRENT behavior. Your delta specs describe CHANGES to this behavior.
+**IF mode is `openspec` or `hybrid`:** If `openspec/specs/{domain}/spec.md` exists, read it to understand CURRENT behavior. Your delta specs describe CHANGES to this behavior.
 
-### Step 3: Write Delta Specs
+**IF mode is `engram`:** Existing specs were already retrieved from Engram in the Persistence Contract. Skip filesystem reads.
 
-Create specs inside the change folder:
+**IF mode is `none`:** Skip — no existing specs to read.
+
+### Step 4: Write Delta Specs
+
+**IF mode is `openspec` or `hybrid`:** Create specs inside the change folder:
 
 ```
 openspec/changes/{change-name}/
@@ -48,6 +89,8 @@ openspec/changes/{change-name}/
     └── {domain}/
         └── spec.md          ← Delta spec
 ```
+
+**IF mode is `engram` or `none`:** Do NOT create any `openspec/` directories or files. Compose the spec content in memory — you will persist it in Step 5.
 
 #### Delta Spec Format
 
@@ -119,7 +162,28 @@ The system {MUST/SHALL/SHOULD} {behavior}.
 - THEN {outcome}
 ```
 
-### Step 4: Return Summary
+### Step 5: Persist Artifact
+
+**This step is MANDATORY — do NOT skip it.**
+
+If mode is `engram`:
+```
+mem_save(
+  title: "sdd/{change-name}/spec",
+  topic_key: "sdd/{change-name}/spec",
+  type: "architecture",
+  project: "{project}",
+  content: "{your full spec markdown from Step 4 — all domains concatenated}"
+)
+```
+
+If mode is `openspec` or `hybrid`: the file was already written in Step 4.
+
+If mode is `hybrid`: also call `mem_save` as above (write to BOTH backends).
+
+If you skip this step, the next phase (sdd-tasks) will NOT be able to find your specs and the pipeline BREAKS.
+
+### Step 6: Return Summary
 
 Return to the orchestrator:
 

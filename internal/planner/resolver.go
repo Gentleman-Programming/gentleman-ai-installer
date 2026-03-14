@@ -45,7 +45,7 @@ func (r dependencyResolver) Resolve(selection model.Selection) (ResolvedPlan, er
 	resolved.OrderedComponents = orderedComponents
 
 	for _, agent := range selection.Agents {
-		if catalog.IsMVPAgent(agent) {
+		if catalog.IsSupportedAgent(agent) {
 			resolved.Agents = append(resolved.Agents, agent)
 			continue
 		}

@@ -10,6 +10,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/backup"
 	"github.com/gentleman-programming/gentle-ai/internal/catalog"
 	"github.com/gentleman-programming/gentle-ai/internal/model"
+	"github.com/gentleman-programming/gentle-ai/internal/opencode"
 	"github.com/gentleman-programming/gentle-ai/internal/pipeline"
 	"github.com/gentleman-programming/gentle-ai/internal/planner"
 	"github.com/gentleman-programming/gentle-ai/internal/system"
@@ -72,9 +73,11 @@ const (
 	ScreenAgents
 	ScreenPersona
 	ScreenPreset
+	ScreenSDDMode
 	ScreenDependencyTree
 	ScreenReview
 	ScreenInstalling
+	ScreenModelPicker
 	ScreenComplete
 	ScreenBackups
 )
@@ -95,6 +98,7 @@ type Model struct {
 	Progress       ProgressState
 	Execution      pipeline.ExecutionResult
 	Backups        []backup.Manifest
+	ModelPicker    screens.ModelPickerState
 	Err            error
 
 	// ExecuteFn is called to run the real pipeline. When nil, the installing
@@ -268,6 +272,10 @@ func (m Model) View() string {
 		return screens.RenderPersona(m.Selection.Persona, m.Cursor)
 	case ScreenPreset:
 		return screens.RenderPreset(m.Selection.Preset, m.Cursor)
+	case ScreenSDDMode:
+		return screens.RenderSDDMode(m.Selection.SDDMode, m.Cursor)
+	case ScreenModelPicker:
+		return screens.RenderModelPicker(m.Selection.ModelAssignments, m.ModelPicker, m.Cursor)
 	case ScreenDependencyTree:
 		return screens.RenderDependencyTree(m.DependencyPlan, m.Selection, m.Cursor)
 	case ScreenReview:
@@ -278,6 +286,7 @@ func (m Model) View() string {
 		return screens.RenderComplete(screens.CompletePayload{
 			ConfiguredAgents:    len(m.Selection.Agents),
 			InstalledComponents: len(m.Selection.Components),
+			GGAInstalled:        hasSelectedComponent(m.Selection.Components, model.ComponentGGA),
 			FailedSteps:         extractFailedSteps(m.Execution),
 			RollbackPerformed:   len(m.Execution.Rollback.Steps) > 0,
 			MissingDeps:         extractMissingDeps(m.Detection),
@@ -291,7 +300,18 @@ func (m Model) View() string {
 }
 
 func (m Model) handleKeyPress(key tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch key.String() {
+	keyStr := key.String()
+
+	// When the model picker is in a sub-mode, delegate navigation there first.
+	if m.Screen == ScreenModelPicker && m.ModelPicker.Mode != screens.ModePhaseList {
+		handled, updated := screens.HandleModelPickerNav(keyStr, &m.ModelPicker, m.Selection.ModelAssignments)
+		if handled {
+			m.Selection.ModelAssignments = updated
+			return m, nil
+		}
+	}
+
+	switch keyStr {
 	case "ctrl+c", "q":
 		return m, tea.Quit
 	case "up", "k":
@@ -367,11 +387,56 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 		if m.Cursor < len(options) {
 			m.Selection.Preset = options[m.Cursor]
 			m.Selection.Components = componentsForPreset(options[m.Cursor])
+			if m.shouldShowSDDModeScreen() {
+				m.setScreen(ScreenSDDMode)
+				return m, nil
+			}
 			m.buildDependencyPlan()
 			m.setScreen(ScreenDependencyTree)
 			return m, nil
 		}
 		m.setScreen(ScreenPersona)
+	case ScreenSDDMode:
+		options := screens.SDDModeOptions()
+		if m.Cursor < len(options) {
+			m.Selection.SDDMode = options[m.Cursor]
+			if m.Selection.SDDMode == model.SDDModeMulti {
+				m.ModelPicker = screens.NewModelPickerState(opencode.DefaultCachePath())
+				m.setScreen(ScreenModelPicker)
+				return m, nil
+			}
+			m.Selection.ModelAssignments = nil
+			m.buildDependencyPlan()
+			m.setScreen(ScreenDependencyTree)
+			return m, nil
+		}
+		m.setScreen(ScreenPreset)
+	case ScreenModelPicker:
+		// When no providers are detected the screen only shows a "Back" option
+		// at cursor 0.  Handle that before the normal row logic.
+		if len(m.ModelPicker.AvailableIDs) == 0 {
+			// Go back to SDD mode so the user can switch to single mode.
+			m.setScreen(ScreenSDDMode)
+			return m, nil
+		}
+		rows := screens.ModelPickerRows()
+		if m.Cursor < len(rows) {
+			// Enter sub-selection: pick provider then model.
+			m.ModelPicker.SelectedPhaseIdx = m.Cursor
+			m.ModelPicker.Mode = screens.ModeProviderSelect
+			m.ModelPicker.ProviderCursor = 0
+			m.ModelPicker.ProviderScroll = 0
+			return m, nil
+		}
+		// After the rows: Continue (cursor == len(rows)), Back (cursor == len(rows)+1).
+		if m.Cursor == len(rows) {
+			// Continue -> proceed to dependency tree.
+			m.buildDependencyPlan()
+			m.setScreen(ScreenDependencyTree)
+			return m, nil
+		}
+		// Back -> return to SDD mode screen.
+		m.setScreen(ScreenSDDMode)
 	case ScreenDependencyTree:
 		if m.Selection.Preset == model.PresetCustom {
 			allComps := screens.AllComponents()
@@ -505,6 +570,17 @@ func buildProgressLabels(resolved planner.ResolvedPlan) []string {
 }
 
 func (m Model) goBack() Model {
+	// If going back from DependencyTree and the SDDMode screen was shown,
+	// navigate to the correct prior screen based on the selected SDD mode.
+	if m.Screen == ScreenDependencyTree && m.shouldShowSDDModeScreen() {
+		if m.Selection.SDDMode == model.SDDModeMulti {
+			m.setScreen(ScreenModelPicker)
+		} else {
+			m.setScreen(ScreenSDDMode)
+		}
+		return m
+	}
+
 	previous, ok := PreviousScreen(m.Screen)
 	if !ok {
 		return m
@@ -532,6 +608,13 @@ func (m Model) optionCount() int {
 		return len(screens.PersonaOptions()) + 1
 	case ScreenPreset:
 		return len(screens.PresetOptions()) + 1
+	case ScreenSDDMode:
+		return len(screens.SDDModeOptions()) + 1
+	case ScreenModelPicker:
+		if len(m.ModelPicker.AvailableIDs) == 0 {
+			return 1 // only "Back to SDD mode"
+		}
+		return len(screens.ModelPickerRows()) + 2 // rows + Continue + Back
 	case ScreenDependencyTree:
 		if m.Selection.Preset == model.PresetCustom {
 			return len(screens.AllComponents()) + len(screens.DependencyTreeOptions())
@@ -607,6 +690,12 @@ func preselectedAgents(detection system.DetectionResult) []model.AgentID {
 			selected = append(selected, model.AgentClaudeCode)
 		case string(model.AgentOpenCode):
 			selected = append(selected, model.AgentOpenCode)
+		case string(model.AgentGeminiCLI):
+			selected = append(selected, model.AgentGeminiCLI)
+		case string(model.AgentCursor):
+			selected = append(selected, model.AgentCursor)
+		case string(model.AgentVSCodeCopilot):
+			selected = append(selected, model.AgentVSCodeCopilot)
 		}
 	}
 
@@ -614,7 +703,7 @@ func preselectedAgents(detection system.DetectionResult) []model.AgentID {
 		return selected
 	}
 
-	agents := catalog.MVPAgents()
+	agents := catalog.AllAgents()
 	selected = make([]model.AgentID, 0, len(agents))
 	for _, agent := range agents {
 		selected = append(selected, agent.ID)
@@ -670,6 +759,11 @@ func extractAvailableUpdates(results []update.UpdateResult) []screens.UpdateInfo
 	return updates
 }
 
+func (m Model) shouldShowSDDModeScreen() bool {
+	return m.Selection.HasAgent(model.AgentOpenCode) &&
+		hasSelectedComponent(m.Selection.Components, model.ComponentSDD)
+}
+
 func componentsForPreset(preset model.PresetID) []model.ComponentID {
 	switch preset {
 	case model.PresetMinimal:
@@ -689,4 +783,13 @@ func componentsForPreset(preset model.PresetID) []model.ComponentID {
 			model.ComponentGGA,
 		}
 	}
+}
+
+func hasSelectedComponent(components []model.ComponentID, target model.ComponentID) bool {
+	for _, c := range components {
+		if c == target {
+			return true
+		}
+	}
+	return false
 }

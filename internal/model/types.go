@@ -77,7 +77,7 @@ const (
 	StrategyMarkdownSections SystemPromptStrategy = iota
 	// StrategyFileReplace replaces the entire system prompt file (OpenCode AGENTS.md).
 	StrategyFileReplace
-	// StrategyAppendToFile appends content to an existing system prompt file (Gemini CLI, Cursor).
+	// StrategyAppendToFile appends content to an existing system prompt file.
 	StrategyAppendToFile
 )
 
@@ -102,4 +102,11 @@ const (
 	PresetEcosystemOnly PresetID = "ecosystem-only"
 	PresetMinimal       PresetID = "minimal"
 	PresetCustom        PresetID = "custom"
+)
+
+type SDDModeID string
+
+const (
+	SDDModeSingle SDDModeID = "single"
+	SDDModeMulti  SDDModeID = "multi"
 )

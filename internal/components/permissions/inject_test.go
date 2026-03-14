@@ -203,6 +203,55 @@ func TestInjectVSCodeCopilotUsesAutoApprove(t *testing.T) {
 	}
 }
 
+func TestInjectVSCodeCopilotMergesIntoJSONCSettings(t *testing.T) {
+	home := t.TempDir()
+
+	adapter := vscodeAdapter()
+	settingsPath := adapter.SettingsPath(home)
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	baseSettings := `{
+	  // User has comments and trailing commas in VS Code settings
+	  "editor.formatOnSave": true,
+	  "files.exclude": {
+	    "**/.git": true,
+	  },
+	}
+`
+	if err := os.WriteFile(settingsPath, []byte(baseSettings), 0o644); err != nil {
+		t.Fatalf("WriteFile(settings.json) error = %v", err)
+	}
+
+	result, err := Inject(home, adapter)
+	if err != nil {
+		t.Fatalf("Inject() error = %v", err)
+	}
+	if !result.Changed {
+		t.Fatal("Inject() changed = false")
+	}
+
+	content, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("read settings file: %v", err)
+	}
+
+	var settings map[string]any
+	if err := json.Unmarshal(content, &settings); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	autoApprove, ok := settings["chat.tools.autoApprove"].(bool)
+	if !ok || !autoApprove {
+		t.Fatalf("expected chat.tools.autoApprove=true, got %v", settings["chat.tools.autoApprove"])
+	}
+
+	if settings["editor.formatOnSave"] != true {
+		t.Fatalf("expected editor.formatOnSave=true, got %v", settings["editor.formatOnSave"])
+	}
+}
+
 func TestInjectCursorSkipsPermissions(t *testing.T) {
 	home := t.TempDir()
 

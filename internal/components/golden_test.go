@@ -75,7 +75,7 @@ func TestGoldenConfigs(t *testing.T) {
 func TestGoldenSDD_Claude(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := sdd.Inject(home, claudeAdapter())
+	result, err := sdd.Inject(home, claudeAdapter(), "")
 	if err != nil {
 		t.Fatalf("sdd.Inject(claude) error = %v", err)
 	}
@@ -90,7 +90,7 @@ func TestGoldenSDD_Claude(t *testing.T) {
 func TestGoldenSDD_OpenCode(t *testing.T) {
 	home := t.TempDir()
 
-	result, err := sdd.Inject(home, opencodeAdapter())
+	result, err := sdd.Inject(home, opencodeAdapter(), "")
 	if err != nil {
 		t.Fatalf("sdd.Inject(opencode) error = %v", err)
 	}
@@ -118,6 +118,22 @@ func TestGoldenSDD_OpenCode(t *testing.T) {
 			t.Errorf("expected command file %q not found: %v", name, err)
 		}
 	}
+}
+
+func TestGoldenSDD_OpenCode_Multi(t *testing.T) {
+	home := t.TempDir()
+
+	result, err := sdd.Inject(home, opencodeAdapter(), "multi")
+	if err != nil {
+		t.Fatalf("sdd.Inject(opencode, multi) error = %v", err)
+	}
+	if !result.Changed {
+		t.Fatalf("sdd.Inject(opencode, multi) changed = false")
+	}
+
+	// Golden-check the settings file with multi overlay merged.
+	settingsJSON := readTestFile(t, filepath.Join(home, ".config", "opencode", "opencode.json"))
+	assertGolden(t, "sdd-opencode-multi-settings.golden", settingsJSON)
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +330,7 @@ func TestGoldenCombined_Claude(t *testing.T) {
 	if _, err := persona.Inject(home, claudeAdapter(), model.PersonaGentleman); err != nil {
 		t.Fatalf("persona.Inject error = %v", err)
 	}
-	if _, err := sdd.Inject(home, claudeAdapter()); err != nil {
+	if _, err := sdd.Inject(home, claudeAdapter(), ""); err != nil {
 		t.Fatalf("sdd.Inject error = %v", err)
 	}
 	if _, err := engram.Inject(home, claudeAdapter()); err != nil {

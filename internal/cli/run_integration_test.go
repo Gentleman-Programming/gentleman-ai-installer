@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
 
@@ -374,6 +376,13 @@ func TestRunInstallLinuxAgentInstallResolvesGoInstallCommand(t *testing.T) {
 	recorder := &commandRecorder{}
 	runCommand = recorder.record
 
+	// Set the agent adapter's lookPath to simulate missing opencode
+	opencodeAdapterLookPath := opencode.LookPathOverride
+	opencode.LookPathOverride = missingBinaryLookPath
+	t.Cleanup(func() {
+		opencode.LookPathOverride = opencodeAdapterLookPath
+	})
+
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
 	_, err := RunInstall(
 		[]string{"--agent", "opencode", "--component", "permissions"},
@@ -690,9 +699,168 @@ func TestRunInstallEngramSkipsInstallWhenAlreadyOnPath(t *testing.T) {
 
 	// No brew/go install commands should have been recorded — only agent install.
 	for _, cmd := range recorder.get() {
-		if strings.Contains(cmd, "engram") {
+		if strings.Contains(cmd, "brew install engram") || (strings.Contains(cmd, "go install") && strings.Contains(cmd, "engram")) {
 			t.Fatalf("expected engram install to be skipped, but got command: %s", cmd)
 		}
+	}
+}
+
+func TestRunInstallEngramAttemptsOpenCodeSetupWhenBinaryPresent(t *testing.T) {
+	home := t.TempDir()
+	restoreHome := osUserHomeDir
+	restoreCommand := runCommand
+	restoreLookPath := cmdLookPath
+	t.Cleanup(func() {
+		osUserHomeDir = restoreHome
+		runCommand = restoreCommand
+		cmdLookPath = restoreLookPath
+	})
+
+	osUserHomeDir = func() (string, error) { return home, nil }
+	cmdLookPath = func(name string) (string, error) {
+		return "/usr/local/bin/" + name, nil
+	}
+	recorder := &commandRecorder{}
+	runCommand = recorder.record
+
+	result, err := RunInstall(
+		[]string{"--agent", "opencode", "--component", "engram"},
+		macOSDetectionResult(),
+	)
+	if err != nil {
+		t.Fatalf("RunInstall() error = %v", err)
+	}
+	if !result.Verify.Ready {
+		t.Fatalf("verification ready = false")
+	}
+
+	commands := recorder.get()
+	foundSetup := false
+	for _, cmd := range commands {
+		if strings.Contains(cmd, "engram setup opencode") {
+			foundSetup = true
+			break
+		}
+	}
+	if !foundSetup {
+		t.Fatalf("expected engram setup command, got commands: %v", commands)
+	}
+}
+
+func TestRunInstallEngramFallsBackToInjectWhenSetupFails(t *testing.T) {
+	home := t.TempDir()
+	restoreHome := osUserHomeDir
+	restoreCommand := runCommand
+	restoreLookPath := cmdLookPath
+	t.Cleanup(func() {
+		osUserHomeDir = restoreHome
+		runCommand = restoreCommand
+		cmdLookPath = restoreLookPath
+	})
+
+	osUserHomeDir = func() (string, error) { return home, nil }
+	cmdLookPath = func(name string) (string, error) {
+		return "/usr/local/bin/" + name, nil
+	}
+	runCommand = func(name string, args ...string) error {
+		if name == "engram" && len(args) == 2 && args[0] == "setup" && args[1] == "opencode" {
+			return errors.New("setup failed")
+		}
+		return nil
+	}
+
+	result, err := RunInstall(
+		[]string{"--agent", "opencode", "--component", "engram"},
+		macOSDetectionResult(),
+	)
+	if err != nil {
+		t.Fatalf("RunInstall() error = %v", err)
+	}
+	if !result.Verify.Ready {
+		t.Fatalf("verification ready = false")
+	}
+
+	configPath := filepath.Join(home, ".config", "opencode", "opencode.json")
+	if _, err := os.Stat(configPath); err != nil {
+		t.Fatalf("expected fallback inject to create %q: %v", configPath, err)
+	}
+}
+
+func TestRunInstallEngramSetupStrictFailsWhenSetupFails(t *testing.T) {
+	t.Setenv("GENTLE_AI_ENGRAM_SETUP_STRICT", "1")
+
+	home := t.TempDir()
+	restoreHome := osUserHomeDir
+	restoreCommand := runCommand
+	restoreLookPath := cmdLookPath
+	t.Cleanup(func() {
+		osUserHomeDir = restoreHome
+		runCommand = restoreCommand
+		cmdLookPath = restoreLookPath
+	})
+
+	osUserHomeDir = func() (string, error) { return home, nil }
+	cmdLookPath = func(name string) (string, error) {
+		return "/usr/local/bin/" + name, nil
+	}
+	runCommand = func(name string, args ...string) error {
+		if name == "engram" && len(args) == 2 && args[0] == "setup" && args[1] == "opencode" {
+			return errors.New("setup failed")
+		}
+		return nil
+	}
+
+	_, err := RunInstall(
+		[]string{"--agent", "opencode", "--component", "engram"},
+		macOSDetectionResult(),
+	)
+	if err == nil {
+		t.Fatalf("RunInstall() expected error in strict setup mode")
+	}
+	if !strings.Contains(err.Error(), "engram setup for \"opencode\"") {
+		t.Fatalf("RunInstall() error = %v, want setup error", err)
+	}
+}
+
+func TestRunInstallEngramDefaultModeAttemptsClaudeSetup(t *testing.T) {
+	home := t.TempDir()
+	restoreHome := osUserHomeDir
+	restoreCommand := runCommand
+	restoreLookPath := cmdLookPath
+	t.Cleanup(func() {
+		osUserHomeDir = restoreHome
+		runCommand = restoreCommand
+		cmdLookPath = restoreLookPath
+	})
+
+	osUserHomeDir = func() (string, error) { return home, nil }
+	cmdLookPath = func(name string) (string, error) {
+		return "/usr/local/bin/" + name, nil
+	}
+	recorder := &commandRecorder{}
+	runCommand = recorder.record
+
+	result, err := RunInstall(
+		[]string{"--agent", "claude-code", "--component", "engram"},
+		macOSDetectionResult(),
+	)
+	if err != nil {
+		t.Fatalf("RunInstall() error = %v", err)
+	}
+	if !result.Verify.Ready {
+		t.Fatalf("verification ready = false")
+	}
+
+	commands := recorder.get()
+	foundSetup := false
+	for _, cmd := range commands {
+		if strings.Contains(cmd, "engram setup claude-code") {
+			foundSetup = true
+			break
+		}
+	}
+	if !foundSetup {
+		t.Fatalf("expected default setup mode to attempt claude-code setup, got commands: %v", commands)
 	}
 }
 
@@ -732,6 +900,76 @@ func TestRunInstallGGASkipsInstallWhenAlreadyOnPath(t *testing.T) {
 		if strings.Contains(cmd, "gga") || strings.Contains(cmd, "gentleman-guardian-angel") {
 			t.Fatalf("expected gga install to be skipped, but got command: %s", cmd)
 		}
+	}
+
+	prModePath := filepath.Join(home, ".local", "share", "gga", "lib", "pr_mode.sh")
+	content, err := os.ReadFile(prModePath)
+	if err != nil {
+		t.Fatalf("expected gga runtime asset at %q: %v", prModePath, err)
+	}
+	if !strings.Contains(string(content), "detect_base_branch") {
+		t.Fatalf("expected pr_mode.sh to contain detect_base_branch")
+	}
+}
+
+func TestRunInstallGGALinuxIncludesTempCleanupBeforeClone(t *testing.T) {
+	home := t.TempDir()
+	restoreHome := osUserHomeDir
+	restoreCommand := runCommand
+	restoreLookPath := cmdLookPath
+	t.Cleanup(func() {
+		osUserHomeDir = restoreHome
+		runCommand = restoreCommand
+		cmdLookPath = restoreLookPath
+	})
+
+	osUserHomeDir = func() (string, error) { return home, nil }
+	cmdLookPath = func(name string) (string, error) {
+		if name == "gga" {
+			return "", exec.ErrNotFound
+		}
+		return "/usr/local/bin/" + name, nil
+	}
+	recorder := &commandRecorder{}
+	runCommand = recorder.record
+
+	result, err := RunInstall(
+		[]string{"--agent", "opencode", "--component", "gga"},
+		linuxDetectionResult(system.LinuxDistroUbuntu, "apt"),
+	)
+	if err != nil {
+		t.Fatalf("RunInstall() error = %v", err)
+	}
+	if !result.Verify.Ready {
+		t.Fatalf("verification ready = false")
+	}
+
+	commands := recorder.get()
+	cleanupIdx := -1
+	cloneIdx := -1
+	for i, cmd := range commands {
+		if strings.Contains(cmd, "rm -rf /tmp/gentleman-guardian-angel") {
+			cleanupIdx = i
+		}
+		if strings.Contains(cmd, "git clone https://github.com/Gentleman-Programming/gentleman-guardian-angel.git /tmp/gentleman-guardian-angel") {
+			cloneIdx = i
+		}
+	}
+
+	for _, cmd := range commands {
+		if strings.Contains(cmd, "gga install") || strings.Contains(cmd, "gga init") {
+			t.Fatalf("expected global gga provisioning only, got repo-level command: %s", cmd)
+		}
+	}
+
+	if cleanupIdx == -1 {
+		t.Fatalf("expected cleanup command before clone, got commands: %v", commands)
+	}
+	if cloneIdx == -1 {
+		t.Fatalf("expected clone command, got commands: %v", commands)
+	}
+	if cleanupIdx >= cloneIdx {
+		t.Fatalf("cleanup should run before clone (cleanup=%d clone=%d)", cleanupIdx, cloneIdx)
 	}
 }
 

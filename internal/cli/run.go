@@ -118,11 +118,68 @@ func RunInstall(args []string, detection system.DetectionResult) (InstallResult,
 	}
 
 	result.Verify = runPostApplyVerification(homeDir, input.Selection, resolved)
+	result.Verify = withPostInstallNotes(result.Verify, resolved)
 	if !result.Verify.Ready {
 		return result, fmt.Errorf("post-apply verification failed:\n%s", verify.RenderReport(result.Verify))
 	}
 
 	return result, nil
+}
+
+func withPostInstallNotes(report verify.Report, resolved planner.ResolvedPlan) verify.Report {
+	if hasComponent(resolved.OrderedComponents, model.ComponentGGA) && report.Ready {
+		report.FinalNote = report.FinalNote + "\n\nGGA is now installed globally. To enable project hooks, run in each repo:\n- gga init\n- gga install"
+	}
+	report = withGoInstallPathNote(report, resolved)
+	return report
+}
+
+// withGoInstallPathNote appends a PATH guidance note when engram was installed
+// via `go install` (non-brew platforms) and the Go binary directory is not in
+// the user's PATH. This helps users on Linux/Windows who may not have
+// ~/go/bin (or $GOPATH/bin / $GOBIN) in their PATH.
+func withGoInstallPathNote(report verify.Report, resolved planner.ResolvedPlan) verify.Report {
+	if !hasComponent(resolved.OrderedComponents, model.ComponentEngram) {
+		return report
+	}
+	if resolved.PlatformDecision.PackageManager == "brew" {
+		return report
+	}
+	binDir := goInstallBinDir()
+	if isInPATH(binDir) {
+		return report
+	}
+	report.FinalNote = report.FinalNote + fmt.Sprintf(
+		"\n\nThe engram binary was installed to %s via `go install`.\nAdd it to your PATH: %s",
+		binDir,
+		engramPathGuidance(os.Getenv("SHELL")),
+	)
+	return report
+}
+
+// goInstallBinDir returns the directory where `go install` places binaries.
+// Resolution order: $GOBIN > $GOPATH/bin > $HOME/go/bin.
+func goInstallBinDir() string {
+	if gobin := os.Getenv("GOBIN"); gobin != "" {
+		return gobin
+	}
+	if gopath := os.Getenv("GOPATH"); gopath != "" {
+		return filepath.Join(gopath, "bin")
+	}
+	if home, err := osUserHomeDir(); err == nil {
+		return filepath.Join(home, "go", "bin")
+	}
+	return filepath.Join("~", "go", "bin")
+}
+
+// isInPATH reports whether dir is present in the current PATH.
+func isInPATH(dir string) bool {
+	for _, entry := range filepath.SplitList(os.Getenv("PATH")) {
+		if entry == dir {
+			return true
+		}
+	}
+	return false
 }
 
 func buildStagePlan(selection model.Selection, resolved planner.ResolvedPlan) pipeline.StagePlan {
@@ -193,7 +250,7 @@ func (r *installRuntime) stagePlan() pipeline.StagePlan {
 	apply = append(apply, rollbackRestoreStep{id: "apply:rollback-restore", state: r.state})
 
 	for _, agent := range r.resolved.Agents {
-		apply = append(apply, agentInstallStep{id: "agent:" + string(agent), agent: agent, profile: r.profile})
+		apply = append(apply, agentInstallStep{id: "agent:" + string(agent), agent: agent, homeDir: r.homeDir, profile: r.profile})
 	}
 
 	for _, component := range r.resolved.OrderedComponents {
@@ -256,6 +313,7 @@ func (s rollbackRestoreStep) Rollback() error {
 type agentInstallStep struct {
 	id      string
 	agent   model.AgentID
+	homeDir string
 	profile system.PlatformProfile
 }
 
@@ -270,6 +328,14 @@ func (s agentInstallStep) Run() error {
 	}
 
 	if !adapter.SupportsAutoInstall() {
+		return nil
+	}
+
+	installed, _, _, _, err := adapter.Detect(context.Background(), s.homeDir)
+	if err != nil {
+		return fmt.Errorf("detect agent %q: %w", s.agent, err)
+	}
+	if installed {
 		return nil
 	}
 
@@ -339,7 +405,17 @@ func (s componentApplyStep) Run() error {
 				return err
 			}
 		}
+		setupMode := engram.ParseSetupMode(os.Getenv(engram.SetupModeEnvVar))
+		setupStrict := engram.ParseSetupStrict(os.Getenv(engram.SetupStrictEnvVar))
 		for _, adapter := range adapters {
+			if engram.ShouldAttemptSetup(setupMode, adapter.Agent()) {
+				slug, _ := engram.SetupAgentSlug(adapter.Agent())
+				if err := runCommand("engram", "setup", slug); err != nil {
+					if setupStrict {
+						return fmt.Errorf("engram setup for %q: %w", adapter.Agent(), err)
+					}
+				}
+			}
 			if _, err := engram.Inject(s.homeDir, adapter); err != nil {
 				return fmt.Errorf("inject engram for %q: %w", adapter.Agent(), err)
 			}
@@ -368,7 +444,7 @@ func (s componentApplyStep) Run() error {
 		return nil
 	case model.ComponentSDD:
 		for _, adapter := range adapters {
-			if _, err := sdd.Inject(s.homeDir, adapter); err != nil {
+			if _, err := sdd.Inject(s.homeDir, adapter, s.selection.SDDMode, s.selection.ModelAssignments); err != nil {
 				return fmt.Errorf("inject sdd for %q: %w", adapter.Agent(), err)
 			}
 		}
@@ -385,8 +461,8 @@ func (s componentApplyStep) Run() error {
 		}
 		return nil
 	case model.ComponentGGA:
-		if _, err := cmdLookPath("gga"); err != nil {
-			// GGA not on PATH — install it.
+		if !ggaAvailable(s.profile) {
+			// GGA not found on any known PATH — install it.
 			commands, err := gga.InstallCommand(s.profile)
 			if err != nil {
 				return fmt.Errorf("resolve install command for component %q: %w", s.component, err)
@@ -394,6 +470,9 @@ func (s componentApplyStep) Run() error {
 			if err := runCommandSequence(commands); err != nil {
 				return err
 			}
+		}
+		if err := gga.EnsureRuntimeAssets(s.homeDir); err != nil {
+			return fmt.Errorf("ensure gga runtime assets: %w", err)
 		}
 		if _, err := gga.Inject(s.homeDir, s.agents); err != nil {
 			return fmt.Errorf("inject gga config: %w", err)
@@ -475,6 +554,23 @@ func ResolveInstallProfile(detection system.DetectionResult) system.PlatformProf
 		PackageManager: "brew",
 		Supported:      true,
 	}
+}
+
+// ggaAvailable reports whether the gga binary is reachable. gga is often
+// installed to ~/.local/bin (the default for install.sh on Linux and Git Bash
+// on Windows), which is not always added to the process PATH. We check the
+// filesystem directly to avoid spawning a subprocess and to work regardless
+// of whether ~/.local/bin has been added to PATH.
+func ggaAvailable(_ system.PlatformProfile) bool {
+	if _, err := cmdLookPath("gga"); err == nil {
+		return true
+	}
+	homeDir, err := osUserHomeDir()
+	if err != nil {
+		return false
+	}
+	_, err = osStat(filepath.Join(homeDir, ".local", "bin", "gga"))
+	return err == nil
 }
 
 // runCommandSequence runs each command in the sequence one at a time, stopping on first error.
@@ -565,12 +661,36 @@ func componentPaths(homeDir string, selection model.Selection, adapters []agents
 				paths = append(paths, adapter.SystemPromptFile(homeDir))
 			}
 		case model.ComponentSDD:
-			if adapter.SystemPromptStrategy() == model.StrategyMarkdownSections {
+			if adapter.SupportsSystemPrompt() {
 				paths = append(paths, adapter.SystemPromptFile(homeDir))
 			}
 			if adapter.SupportsSlashCommands() {
 				for _, command := range sdd.OpenCodeCommands() {
 					paths = append(paths, filepath.Join(adapter.CommandsDir(homeDir), command.Name+".md"))
+				}
+			}
+			if adapter.Agent() == model.AgentOpenCode {
+				if p := adapter.SettingsPath(homeDir); p != "" {
+					paths = append(paths, p)
+				}
+			}
+			if adapter.SupportsSkills() {
+				skillDir := adapter.SkillsDir(homeDir)
+				if skillDir != "" {
+					paths = append(paths,
+						filepath.Join(skillDir, "_shared", "persistence-contract.md"),
+						filepath.Join(skillDir, "_shared", "engram-convention.md"),
+						filepath.Join(skillDir, "_shared", "openspec-convention.md"),
+						filepath.Join(skillDir, "sdd-init", "SKILL.md"),
+						filepath.Join(skillDir, "sdd-explore", "SKILL.md"),
+						filepath.Join(skillDir, "sdd-propose", "SKILL.md"),
+						filepath.Join(skillDir, "sdd-spec", "SKILL.md"),
+						filepath.Join(skillDir, "sdd-design", "SKILL.md"),
+						filepath.Join(skillDir, "sdd-tasks", "SKILL.md"),
+						filepath.Join(skillDir, "sdd-apply", "SKILL.md"),
+						filepath.Join(skillDir, "sdd-verify", "SKILL.md"),
+						filepath.Join(skillDir, "sdd-archive", "SKILL.md"),
+					)
 				}
 			}
 		case model.ComponentSkills:
@@ -668,7 +788,10 @@ func engramHealthChecks() []verify.Check {
 			Description: "engram binary on PATH (restart shell if missing)",
 			Soft:        true,
 			Run: func(context.Context) error {
-				return engram.VerifyInstalled()
+				if err := engram.VerifyInstalled(); err != nil {
+					return fmt.Errorf("%w\nIf engram was installed via `go install`, add it to PATH:\n  %s", err, engramPathGuidance(os.Getenv("SHELL")))
+				}
+				return nil
 			},
 		},
 		{
@@ -685,6 +808,20 @@ func engramHealthChecks() []verify.Check {
 			},
 		},
 	}
+}
+
+func engramPathGuidance(shellPath string) string {
+	binDir := goInstallBinDir()
+	if strings.Contains(shellPath, "fish") {
+		return fmt.Sprintf("set -Ux fish_user_paths %s $fish_user_paths", binDir)
+	}
+	if strings.Contains(shellPath, "zsh") {
+		return fmt.Sprintf("echo 'export PATH=\"%s:$PATH\"' >> ~/.zshrc && source ~/.zshrc", binDir)
+	}
+	if strings.Contains(shellPath, "bash") {
+		return fmt.Sprintf("echo 'export PATH=\"%s:$PATH\"' >> ~/.bashrc && source ~/.bashrc", binDir)
+	}
+	return fmt.Sprintf("Add %s to your shell PATH and restart the terminal.", binDir)
 }
 
 // checkDependenciesStep verifies that required system dependencies are present.

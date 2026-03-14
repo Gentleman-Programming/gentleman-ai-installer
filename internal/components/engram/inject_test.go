@@ -100,9 +100,9 @@ func TestInjectOpenCodeMergesEngramToSettings(t *testing.T) {
 		t.Fatalf("Inject() changed = false")
 	}
 
-	// Should only have opencode.json — no plugin files.
-	if len(result.Files) != 1 {
-		t.Fatalf("Inject() files = %v, want exactly 1 (opencode.json)", result.Files)
+	// Should include opencode.json and AGENTS.md (fallback protocol injection).
+	if len(result.Files) != 2 {
+		t.Fatalf("Inject() files = %v, want exactly 2 (opencode.json + AGENTS.md)", result.Files)
 	}
 
 	configPath := filepath.Join(home, ".config", "opencode", "opencode.json")
@@ -132,6 +132,19 @@ func TestInjectOpenCodeMergesEngramToSettings(t *testing.T) {
 	}
 	if strings.Contains(text, `"plugins"`) {
 		t.Fatal("opencode.json should NOT contain plugins key")
+	}
+
+	agentsPath := filepath.Join(home, ".config", "opencode", "AGENTS.md")
+	agentsContent, err := os.ReadFile(agentsPath)
+	if err != nil {
+		t.Fatalf("ReadFile(AGENTS.md) error = %v", err)
+	}
+	agentsText := string(agentsContent)
+	if !strings.Contains(agentsText, "<!-- gentle-ai:engram-protocol -->") {
+		t.Fatal("AGENTS.md missing engram protocol section marker")
+	}
+	if !strings.Contains(agentsText, "mem_save") {
+		t.Fatal("AGENTS.md missing engram protocol content (expected 'mem_save')")
 	}
 }
 

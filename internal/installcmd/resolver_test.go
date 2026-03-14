@@ -117,11 +117,17 @@ func TestGitBashPathResolvesFromGitOnPath(t *testing.T) {
 }
 
 func TestGitBashPathFallsBackToBareWhenNoGit(t *testing.T) {
-	original := cmdLookPath
+	origLookPath := cmdLookPath
 	cmdLookPath = func(file string) (string, error) {
 		return "", fmt.Errorf("not found")
 	}
-	t.Cleanup(func() { cmdLookPath = original })
+	t.Cleanup(func() { cmdLookPath = origLookPath })
+
+	origStat := osStat
+	osStat = func(name string) (os.FileInfo, error) {
+		return nil, fmt.Errorf("not found")
+	}
+	t.Cleanup(func() { osStat = origStat })
 
 	got := gitBashPath()
 	if got != "bash" {
@@ -273,6 +279,7 @@ func TestResolveComponentInstall(t *testing.T) {
 			profile:   system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
 			component: model.ComponentGGA,
 			want: CommandSequence{
+				{"rm", "-rf", "/tmp/gentleman-guardian-angel"},
 				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", "/tmp/gentleman-guardian-angel"},
 				{"bash", "/tmp/gentleman-guardian-angel/install.sh"},
 			},
@@ -282,6 +289,7 @@ func TestResolveComponentInstall(t *testing.T) {
 			profile:   system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
 			component: model.ComponentGGA,
 			want: CommandSequence{
+				{"rm", "-rf", "/tmp/gentleman-guardian-angel"},
 				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", "/tmp/gentleman-guardian-angel"},
 				{"bash", "/tmp/gentleman-guardian-angel/install.sh"},
 			},
@@ -293,12 +301,13 @@ func TestResolveComponentInstall(t *testing.T) {
 			want:      CommandSequence{{"go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}},
 		},
 		{
-			name:      "gga on windows uses git clone and git bash via temp dir",
+			name:      "gga on windows cleans temp dir and uses git bash",
 			profile:   system.PlatformProfile{OS: "windows", PackageManager: "winget"},
 			component: model.ComponentGGA,
 			want: CommandSequence{
+				{"powershell", "-NoProfile", "-Command", fmt.Sprintf("Remove-Item -Recurse -Force -ErrorAction SilentlyContinue '%s'; exit 0", filepath.Join(os.TempDir(), "gentleman-guardian-angel"))},
 				{"git", "clone", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", filepath.Join(os.TempDir(), "gentleman-guardian-angel")},
-				{gitBashPath(), filepath.Join(os.TempDir(), "gentleman-guardian-angel", "install.sh")},
+				{gitBashPath(), bashScriptPath(system.PlatformProfile{OS: "windows"}, filepath.Join(os.TempDir(), "gentleman-guardian-angel", "install.sh"))},
 			},
 		},
 		{

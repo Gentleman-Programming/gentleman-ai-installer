@@ -30,6 +30,7 @@ type UpdateInfo struct {
 type CompletePayload struct {
 	ConfiguredAgents    int
 	InstalledComponents int
+	GGAInstalled        bool
 	FailedSteps         []FailedStep
 	RollbackPerformed   bool
 	MissingDeps         []MissingDep
@@ -64,6 +65,17 @@ func renderCompleteSuccess(data CompletePayload) string {
 	b.WriteString("\n")
 	b.WriteString(styles.UnselectedStyle.Render("  3. Try /sdd-new my-feature"))
 	b.WriteString("\n\n")
+
+	if data.GGAInstalled {
+		b.WriteString(styles.HeadingStyle.Render("GGA (per project)"))
+		b.WriteString("\n")
+		b.WriteString(styles.UnselectedStyle.Render("  GGA was installed globally."))
+		b.WriteString("\n")
+		b.WriteString(styles.UnselectedStyle.Render("  In each repo run: gga init"))
+		b.WriteString("\n")
+		b.WriteString(styles.UnselectedStyle.Render("  Then run: gga install"))
+		b.WriteString("\n\n")
+	}
 
 	b.WriteString(styles.HelpStyle.Render("Press Enter to exit."))
 

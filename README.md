@@ -157,6 +157,19 @@ All agents receive the **full SDD orchestrator** (agent-teams-lite) injected int
 | GGA | `gga` | Gentleman Guardian Angel -- AI provider switcher |
 | Theme | `theme` | Gentleman Kanagawa theme overlay |
 
+### GGA Behavior
+
+`gentle-ai --component gga` installs/provisions the `gga` binary globally on your machine.
+
+It does **not** run project-level hook setup automatically (`gga init` / `gga install`) because that should be an explicit decision per repository.
+
+After global install, enable GGA per project with:
+
+```bash
+gga init
+gga install
+```
+
 ---
 
 ## Skills
@@ -290,6 +303,22 @@ Release binaries are built for `linux`, `darwin`, and `windows` on both `amd64` 
 - **curl** is pre-installed on Windows 10+ and does not require separate installation.
 - **PowerShell** is the default shell when `$SHELL` is not set.
 - Release archives use `.zip` format on Windows (`.tar.gz` on macOS/Linux).
+
+### Windows Security Verification
+
+Some antivirus products can flag unsigned Go binaries heuristically.
+
+Use the release checksum to verify integrity:
+
+```powershell
+# 1) Download checksums.txt from the same release tag
+# 2) Compute local hash
+Get-FileHash .\gentle-ai_<VERSION>_windows_amd64.zip -Algorithm SHA256
+
+# 3) Compare the hash with checksums.txt entry for that file
+```
+
+If the hash matches `checksums.txt`, the file is authentic for that release.
 
 ### Windows Config Paths
 

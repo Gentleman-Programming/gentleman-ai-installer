@@ -272,6 +272,35 @@ test_dry_run_component_theme() {
     assert_output_contains "$output" "theme" "Shows theme component"
 }
 
+# --- Category 1f2: SDD mode flag ---
+
+test_dry_run_sdd_mode_multi() {
+    log_test "Dry-run with --sdd-mode multi"
+
+    output=$($BINARY install --agent opencode --sdd-mode multi --dry-run 2>&1) || true
+
+    assert_output_contains "$output" "opencode" "Shows opencode agent"
+    assert_output_contains "$output" "sdd-mode: multi\|SDDMode: multi\|sdd_mode.*multi\|multi" "Shows multi mode"
+}
+
+test_dry_run_sdd_mode_single() {
+    log_test "Dry-run with --sdd-mode single"
+
+    output=$($BINARY install --agent opencode --sdd-mode single --dry-run 2>&1) || true
+
+    assert_output_contains "$output" "opencode" "Shows opencode agent"
+}
+
+test_dry_run_sdd_mode_invalid_rejected() {
+    log_test "Invalid --sdd-mode is rejected"
+
+    if $BINARY install --agent opencode --sdd-mode turbo --dry-run 2>&1; then
+        log_fail "Invalid sdd-mode should have been rejected"
+    else
+        log_pass "Invalid sdd-mode correctly rejected"
+    fi
+}
+
 # --- Category 1g: Invalid input rejection ---
 
 test_invalid_persona_rejected() {
@@ -552,12 +581,18 @@ test_oc_engram_injection() {
 
     if $BINARY install --agent opencode --component engram --persona neutral 2>&1; then
         local settings="$HOME/.config/opencode/opencode.json"
+        local agents_md="$HOME/.config/opencode/AGENTS.md"
         assert_file_exists "$settings" "OpenCode opencode.json"
         assert_file_contains "$settings" '"mcp"' "Has mcp key"
         assert_file_contains "$settings" '"engram"' "Has engram MCP entry"
         assert_file_contains "$settings" '"command"' "Has command key"
         assert_file_contains "$settings" '"type": "local"' "Engram uses local MCP type"
         assert_valid_json "$settings" "opencode.json is valid JSON"
+
+        # Fallback safety: AGENTS.md must include engram protocol section.
+        assert_file_exists "$agents_md" "OpenCode AGENTS.md"
+        assert_file_contains "$agents_md" 'gentle-ai:engram-protocol' "AGENTS.md has engram-protocol section"
+        assert_file_contains "$agents_md" 'mem_save' "AGENTS.md has memory protocol content"
     else
         log_fail "OpenCode engram install command failed"
     fi
@@ -1182,6 +1217,34 @@ test_gga_config() {
     fi
 }
 
+test_gga_runtime_pr_mode_installed() {
+    log_test "GGA runtime includes pr_mode.sh"
+    cleanup_test_env
+
+    if $BINARY install --agent claude-code --component gga --persona neutral 2>&1; then
+        local pr_mode="$HOME/.local/share/gga/lib/pr_mode.sh"
+        assert_file_exists "$pr_mode" "GGA pr_mode.sh exists"
+        assert_file_contains "$pr_mode" 'detect_base_branch' "pr_mode.sh has PR mode functions"
+    else
+        log_skip "GGA install failed (expected — binary install may require network)"
+    fi
+}
+
+test_gga_reinstall_is_idempotent() {
+    log_test "GGA install is idempotent on second run"
+    cleanup_test_env
+
+    if $BINARY install --agent claude-code --component gga --persona neutral 2>&1; then
+        if $BINARY install --agent claude-code --component gga --persona neutral 2>&1; then
+            log_pass "Second GGA install completed successfully"
+        else
+            log_fail "Second GGA install failed"
+        fi
+    else
+        log_skip "GGA first install failed (expected — binary install may require network)"
+    fi
+}
+
 # --- Category 7: Injection integrity (guards against issue #4 regression) ---
 
 test_integrity_sdd_skills_nonempty() {
@@ -1338,6 +1401,62 @@ test_integrity_skills_plus_sdd_coexist() {
         assert_file_contains "$HOME/.config/opencode/opencode.json" '"sdd-orchestrator"' "sdd-orchestrator present"
     else
         log_fail "SDD + skills coexistence install failed"
+    fi
+}
+
+# --- Category 9: SDD multi-mode tests ---
+
+test_oc_sdd_multi_mode_injection() {
+    log_test "OpenCode: SDD multi-mode injection (10 agents in opencode.json)"
+    cleanup_test_env
+
+    if $BINARY install --agent opencode --component sdd --persona neutral --sdd-mode multi 2>&1; then
+        local settings="$HOME/.config/opencode/opencode.json"
+        assert_file_exists "$settings" "opencode.json exists"
+        assert_valid_json "$settings" "opencode.json is valid JSON"
+        assert_file_contains "$settings" '"sdd-orchestrator"' "Has sdd-orchestrator agent"
+        assert_file_contains "$settings" '"sdd-apply"' "Has sdd-apply sub-agent"
+        assert_file_contains "$settings" '"sdd-init"' "Has sdd-init sub-agent"
+        assert_file_contains "$settings" '"sdd-verify"' "Has sdd-verify sub-agent"
+        assert_file_contains "$settings" '"sdd-explore"' "Has sdd-explore sub-agent"
+        assert_file_contains "$settings" '"sdd-propose"' "Has sdd-propose sub-agent"
+        assert_file_contains "$settings" '"sdd-spec"' "Has sdd-spec sub-agent"
+        assert_file_contains "$settings" '"sdd-design"' "Has sdd-design sub-agent"
+        assert_file_contains "$settings" '"sdd-tasks"' "Has sdd-tasks sub-agent"
+        assert_file_contains "$settings" '"sdd-archive"' "Has sdd-archive sub-agent"
+        assert_file_contains "$settings" '"subagent"' "Sub-agents have mode subagent"
+    else
+        log_fail "OpenCode SDD multi-mode install command failed"
+    fi
+}
+
+test_oc_sdd_single_mode_no_subagents() {
+    log_test "OpenCode: SDD single mode produces only sdd-orchestrator"
+    cleanup_test_env
+
+    if $BINARY install --agent opencode --component sdd --persona neutral --sdd-mode single 2>&1; then
+        local settings="$HOME/.config/opencode/opencode.json"
+        assert_file_exists "$settings" "opencode.json exists"
+        assert_valid_json "$settings" "opencode.json is valid JSON"
+        assert_file_contains "$settings" '"sdd-orchestrator"' "Has sdd-orchestrator agent"
+        assert_file_not_contains "$settings" '"sdd-apply"' "Single mode: no sdd-apply sub-agent"
+        assert_file_not_contains "$settings" '"subagent"' "Single mode: no subagent mode entries"
+    else
+        log_fail "OpenCode SDD single-mode install command failed"
+    fi
+}
+
+test_oc_sdd_default_mode_same_as_single() {
+    log_test "OpenCode: SDD default (no --sdd-mode flag) matches single mode"
+    cleanup_test_env
+
+    if $BINARY install --agent opencode --component sdd --persona neutral 2>&1; then
+        local settings="$HOME/.config/opencode/opencode.json"
+        assert_file_exists "$settings" "opencode.json exists"
+        assert_file_contains "$settings" '"sdd-orchestrator"' "Has sdd-orchestrator"
+        assert_file_not_contains "$settings" '"sdd-apply"' "Default mode: no sdd-apply sub-agent"
+    else
+        log_fail "OpenCode SDD default mode install command failed"
     fi
 }
 
@@ -1507,6 +1626,11 @@ test_dry_run_component_permissions
 test_dry_run_component_gga
 test_dry_run_component_theme
 
+# Category 1f2: SDD mode flag
+test_dry_run_sdd_mode_multi
+test_dry_run_sdd_mode_single
+test_dry_run_sdd_mode_invalid_rejected
+
 # Category 1g: Invalid inputs
 test_invalid_persona_rejected
 test_invalid_component_rejected
@@ -1573,6 +1697,8 @@ if [ "${RUN_FULL_E2E:-0}" = "1" ]; then
 
     # GGA
     test_gga_config
+    test_gga_runtime_pr_mode_installed
+    test_gga_reinstall_is_idempotent
 
     # Category 7: Injection integrity (issue #4 regression guard)
     test_integrity_sdd_skills_nonempty
@@ -1581,6 +1707,11 @@ if [ "${RUN_FULL_E2E:-0}" = "1" ]; then
     test_integrity_full_preset_all_skills_nonempty
     test_integrity_sdd_orchestrator_agent_structure
     test_integrity_skills_plus_sdd_coexist
+
+    # Category 9: SDD multi-mode
+    test_oc_sdd_multi_mode_injection
+    test_oc_sdd_single_mode_no_subagents
+    test_oc_sdd_default_mode_same_as_single
 else
     log_skip "Tier 2 tests (set RUN_FULL_E2E=1 to enable)"
 fi

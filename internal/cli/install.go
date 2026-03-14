@@ -12,6 +12,7 @@ type InstallFlags struct {
 	Skills     []string
 	Persona    string
 	Preset     string
+	SDDMode    string
 	DryRun     bool
 }
 
@@ -28,6 +29,7 @@ func ParseInstallFlags(args []string) (InstallFlags, error) {
 	registerListFlag(fs, "skills", &opts.Skills)
 	fs.StringVar(&opts.Persona, "persona", "", "persona to apply")
 	fs.StringVar(&opts.Preset, "preset", "", "preset to apply")
+	fs.StringVar(&opts.SDDMode, "sdd-mode", "", "SDD orchestrator mode: single or multi (default: single)")
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "preview plan without executing")
 
 	if err := fs.Parse(args); err != nil {

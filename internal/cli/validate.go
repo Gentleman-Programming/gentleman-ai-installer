@@ -47,6 +47,12 @@ func NormalizeInstallFlags(flags InstallFlags, detection system.DetectionResult)
 	}
 	selection.Skills = skills
 
+	sddMode, err := normalizeSDDMode(flags.SDDMode)
+	if err != nil {
+		return InstallInput{}, err
+	}
+	selection.SDDMode = sddMode
+
 	return InstallInput{Selection: selection, DryRun: flags.DryRun}, nil
 }
 
@@ -120,6 +126,19 @@ func normalizeSkills(values []string) ([]model.SkillID, error) {
 	return unique(skills), nil
 }
 
+func normalizeSDDMode(value string) (model.SDDModeID, error) {
+	if strings.TrimSpace(value) == "" {
+		return "", nil
+	}
+
+	switch model.SDDModeID(value) {
+	case model.SDDModeSingle, model.SDDModeMulti:
+		return model.SDDModeID(value), nil
+	default:
+		return "", fmt.Errorf("unsupported sdd-mode %q (valid: single, multi)", value)
+	}
+}
+
 func componentsForPreset(preset model.PresetID) []model.ComponentID {
 	switch preset {
 	case model.PresetMinimal:
@@ -153,6 +172,12 @@ func defaultAgentsFromDetection(detection system.DetectionResult) []model.AgentI
 			agents = append(agents, model.AgentClaudeCode)
 		case string(model.AgentOpenCode):
 			agents = append(agents, model.AgentOpenCode)
+		case string(model.AgentGeminiCLI):
+			agents = append(agents, model.AgentGeminiCLI)
+		case string(model.AgentCursor):
+			agents = append(agents, model.AgentCursor)
+		case string(model.AgentVSCodeCopilot):
+			agents = append(agents, model.AgentVSCodeCopilot)
 		}
 	}
 
@@ -160,7 +185,7 @@ func defaultAgentsFromDetection(detection system.DetectionResult) []model.AgentI
 		return agents
 	}
 
-	catalogAgents := catalog.MVPAgents()
+	catalogAgents := catalog.AllAgents()
 	agents = make([]model.AgentID, 0, len(catalogAgents))
 	for _, agent := range catalogAgents {
 		agents = append(agents, agent.ID)

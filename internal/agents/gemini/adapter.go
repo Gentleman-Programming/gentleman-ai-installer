@@ -10,6 +10,8 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 )
 
+var LookPathOverride = exec.LookPath
+
 type statResult struct {
 	isDir bool
 	err   error
@@ -22,7 +24,7 @@ type Adapter struct {
 
 func NewAdapter() *Adapter {
 	return &Adapter{
-		lookPath: exec.LookPath,
+		lookPath: LookPathOverride,
 		statPath: defaultStat,
 	}
 }

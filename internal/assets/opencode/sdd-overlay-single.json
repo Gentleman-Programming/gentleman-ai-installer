@@ -1,0 +1,15 @@
+{
+  "agent": {
+    "sdd-orchestrator": {
+      "mode": "all",
+      "description": "Gentleman personality + SDD delegate-only orchestrator",
+      "prompt": "{file:./AGENTS.md}",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    }
+  }
+}

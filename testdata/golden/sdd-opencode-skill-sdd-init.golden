@@ -17,8 +17,24 @@ You are a sub-agent responsible for initializing the Spec-Driven Development (SD
 
 Read and follow `skills/_shared/persistence-contract.md` for mode resolution rules.
 
-- If mode is `engram`: Read and follow `skills/_shared/engram-convention.md`. Do not create `openspec/`.
+- If mode is `engram`:
+  Do NOT create `openspec/` directory.
+
+  **Save project context**:
+  ```
+  mem_save(
+    title: "sdd-init/{project-name}",
+    topic_key: "sdd-init/{project-name}",
+    type: "architecture",
+    project: "{project-name}",
+    content: "{detected project context markdown}"
+  )
+  ```
+  `topic_key` enables upserts — re-running init updates the existing context, not duplicates.
+
+  (See `skills/_shared/engram-convention.md` for full naming conventions.)
 - If mode is `openspec`: Read and follow `skills/_shared/openspec-convention.md`. Run full bootstrap.
+- If mode is `hybrid`: Read and follow BOTH convention files. Run openspec bootstrap AND persist context to Engram.
 - If mode is `none`: Return detected context without writing project files.
 
 ## What to Do
@@ -80,7 +96,37 @@ rules:
     - Warn before merging destructive deltas (large removals)
 ```
 
-### Step 4: Return Summary
+### Step 4: Build Skill Registry
+
+Follow the same logic as the `skill-registry` skill (`skills/skill-registry/SKILL.md`):
+
+1. Scan user skills: glob `*/SKILL.md` across ALL known skill directories. **User-level**: `~/.claude/skills/`, `~/.config/opencode/skills/`, `~/.gemini/skills/`, `~/.cursor/skills/`, `~/.copilot/skills/`, parent of this skill file. **Project-level**: `.claude/skills/`, `.gemini/skills/`, `.agent/skills/`, `skills/`. Skip `sdd-*`, `_shared`, `skill-registry`. Deduplicate by name (project-level wins). Read frontmatter triggers.
+2. Scan project conventions: check for `agents.md`, `AGENTS.md`, `CLAUDE.md` (project-level), `.cursorrules`, `GEMINI.md`, `copilot-instructions.md` in the project root. If an index file is found (e.g., `agents.md`), READ it and extract all referenced file paths — include both the index and its referenced files in the registry.
+3. **ALWAYS write `.atl/skill-registry.md`** in the project root (create `.atl/` if needed). This file is mode-independent — it's infrastructure, not an SDD artifact.
+4. If engram is available, **ALSO save to engram**: `mem_save(title: "skill-registry", topic_key: "skill-registry", type: "config", project: "{project}", content: "{registry markdown}")`
+
+See `skills/skill-registry/SKILL.md` for the full registry format and scanning details.
+
+### Step 5: Persist Project Context
+
+**This step is MANDATORY — do NOT skip it.**
+
+If mode is `engram`:
+```
+mem_save(
+  title: "sdd-init/{project-name}",
+  topic_key: "sdd-init/{project-name}",
+  type: "architecture",
+  project: "{project-name}",
+  content: "{your detected project context from Steps 1-4}"
+)
+```
+
+If mode is `openspec` or `hybrid`: the config was already written in Step 3.
+
+If mode is `hybrid`: also call `mem_save` as above (write to BOTH backends).
+
+### Step 6: Return Summary
 
 Return a structured summary adapted to the resolved mode:
 

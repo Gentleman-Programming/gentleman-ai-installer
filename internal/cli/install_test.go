@@ -43,7 +43,7 @@ func TestNormalizeInstallFlagsDefaults(t *testing.T) {
 	}
 
 	want := model.Selection{
-		Agents:  []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode},
+		Agents:  []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode, model.AgentGeminiCLI, model.AgentCursor, model.AgentVSCodeCopilot},
 		Persona: model.PersonaGentleman,
 		Preset:  model.PresetFullGentleman,
 		Components: []model.ComponentID{
@@ -66,6 +66,94 @@ func TestNormalizeInstallFlagsRejectsUnknownPersona(t *testing.T) {
 	_, err := NormalizeInstallFlags(InstallFlags{Persona: "wizard"}, system.DetectionResult{})
 	if err == nil {
 		t.Fatalf("NormalizeInstallFlags() expected error")
+	}
+}
+
+func TestNormalizeSDDMode(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    model.SDDModeID
+		wantErr bool
+	}{
+		{name: "empty returns zero value", input: "", want: ""},
+		{name: "whitespace returns zero value", input: "   ", want: ""},
+		{name: "single is valid", input: "single", want: model.SDDModeSingle},
+		{name: "multi is valid", input: "multi", want: model.SDDModeMulti},
+		{name: "invalid rejected", input: "turbo", wantErr: true},
+		{name: "partial invalid", input: "mult", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := normalizeSDDMode(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("normalizeSDDMode(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Fatalf("normalizeSDDMode(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseInstallFlagsSDDMode(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "flag absent defaults to empty",
+			args: []string{"--agent", "opencode"},
+			want: "",
+		},
+		{
+			name: "flag set to multi",
+			args: []string{"--agent", "opencode", "--sdd-mode", "multi"},
+			want: "multi",
+		},
+		{
+			name: "flag set to single",
+			args: []string{"--agent", "opencode", "--sdd-mode", "single"},
+			want: "single",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flags, err := ParseInstallFlags(tt.args)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ParseInstallFlags() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if flags.SDDMode != tt.want {
+				t.Fatalf("flags.SDDMode = %q, want %q", flags.SDDMode, tt.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeInstallFlagsSDDModeMulti(t *testing.T) {
+	input, err := NormalizeInstallFlags(
+		InstallFlags{SDDMode: "multi"},
+		system.DetectionResult{},
+	)
+	if err != nil {
+		t.Fatalf("NormalizeInstallFlags() error = %v", err)
+	}
+	if input.Selection.SDDMode != model.SDDModeMulti {
+		t.Fatalf("SDDMode = %q, want %q", input.Selection.SDDMode, model.SDDModeMulti)
+	}
+}
+
+func TestNormalizeInstallFlagsSDDModeInvalid(t *testing.T) {
+	_, err := NormalizeInstallFlags(
+		InstallFlags{SDDMode: "turbo"},
+		system.DetectionResult{},
+	)
+	if err == nil {
+		t.Fatal("expected error for invalid sdd-mode")
 	}
 }
 

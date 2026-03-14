@@ -276,6 +276,71 @@ func TestBackupRestoreMsgHandledGracefully(t *testing.T) {
 	}
 }
 
+func TestShouldShowSDDModeScreen(t *testing.T) {
+	tests := []struct {
+		name       string
+		agents     []model.AgentID
+		components []model.ComponentID
+		want       bool
+	}{
+		{
+			name:       "OpenCode + SDD = true",
+			agents:     []model.AgentID{model.AgentOpenCode},
+			components: []model.ComponentID{model.ComponentEngram, model.ComponentSDD},
+			want:       true,
+		},
+		{
+			name:       "Claude only + SDD = false",
+			agents:     []model.AgentID{model.AgentClaudeCode},
+			components: []model.ComponentID{model.ComponentEngram, model.ComponentSDD},
+			want:       false,
+		},
+		{
+			name:       "OpenCode + no SDD = false",
+			agents:     []model.AgentID{model.AgentOpenCode},
+			components: []model.ComponentID{model.ComponentEngram},
+			want:       false,
+		},
+		{
+			name:       "multiple agents including OpenCode + SDD = true",
+			agents:     []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode},
+			components: []model.ComponentID{model.ComponentSDD, model.ComponentEngram},
+			want:       true,
+		},
+		{
+			name:       "no agents + SDD = false",
+			agents:     []model.AgentID{},
+			components: []model.ComponentID{model.ComponentSDD},
+			want:       false,
+		},
+		{
+			name:       "OpenCode + empty components = false",
+			agents:     []model.AgentID{model.AgentOpenCode},
+			components: []model.ComponentID{},
+			want:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewModel(system.DetectionResult{}, "dev")
+			m.Selection.Agents = tt.agents
+			m.Selection.Components = tt.components
+
+			got := m.shouldShowSDDModeScreen()
+			if got != tt.want {
+				t.Fatalf("shouldShowSDDModeScreen() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func screensAgentOptions() []model.AgentID {
-	return []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode}
+	return []model.AgentID{
+		model.AgentClaudeCode,
+		model.AgentOpenCode,
+		model.AgentGeminiCLI,
+		model.AgentCursor,
+		model.AgentVSCodeCopilot,
+	}
 }

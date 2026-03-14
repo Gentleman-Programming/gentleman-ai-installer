@@ -102,8 +102,22 @@ func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 			files = append(files, promptPath)
 
 		default:
-			// For FileReplace/AppendToFile strategies, the engram protocol
-			// is embedded in the persona content — no separate injection needed.
+			promptPath := adapter.SystemPromptFile(homeDir)
+			protocolContent := assets.MustRead("claude/engram-protocol.md")
+
+			existing, err := readFileOrEmpty(promptPath)
+			if err != nil {
+				return InjectionResult{}, err
+			}
+
+			updated := filemerge.InjectMarkdownSection(existing, "engram-protocol", protocolContent)
+
+			mdWrite, err := filemerge.WriteFileAtomic(promptPath, []byte(updated), 0o644)
+			if err != nil {
+				return InjectionResult{}, err
+			}
+			changed = changed || mdWrite.Changed
+			files = append(files, promptPath)
 		}
 	}
 

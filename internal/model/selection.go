@@ -1,11 +1,13 @@
 package model
 
 type Selection struct {
-	Agents     []AgentID
-	Components []ComponentID
-	Skills     []SkillID
-	Persona    PersonaID
-	Preset     PresetID
+	Agents           []AgentID
+	Components       []ComponentID
+	Skills           []SkillID
+	Persona          PersonaID
+	Preset           PresetID
+	SDDMode          SDDModeID
+	ModelAssignments map[string]ModelAssignment // key = sub-agent name (e.g., "sdd-init")
 }
 
 func (s Selection) HasAgent(agent AgentID) bool {
