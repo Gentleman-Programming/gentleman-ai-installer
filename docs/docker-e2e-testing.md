@@ -10,6 +10,7 @@ e2e/
   e2e_test.sh         # All test cases, tiered by env vars
   Dockerfile.ubuntu   # Ubuntu 22.04 test image
   Dockerfile.arch     # Arch Linux test image
+  Dockerfile.fedora   # Fedora 43 test image
   docker-test.sh      # Orchestrator: build + run all platforms
 ```
 
@@ -37,6 +38,7 @@ RUN_FULL_E2E=1 RUN_BACKUP_TESTS=1 ./e2e/docker-test.sh
 |----------|-----------|-----------------|
 | Ubuntu 22.04 | `Dockerfile.ubuntu` | apt |
 | Arch Linux | `Dockerfile.arch` | pacman |
+| Fedora 43 | `Dockerfile.fedora` | dnf |
 
 ## How it works
 
@@ -59,6 +61,10 @@ docker run --rm gentle-ai-e2e-ubuntu
 # Run with full E2E on Arch
 docker build -f e2e/Dockerfile.arch -t gentle-ai-e2e-arch .
 docker run --rm -e RUN_FULL_E2E=1 gentle-ai-e2e-arch
+
+# Build and run Fedora only
+docker build -f e2e/Dockerfile.fedora -t gentle-ai-e2e-fedora .
+docker run --rm gentle-ai-e2e-fedora
 
 # Interactive debugging
 docker run --rm -it gentle-ai-e2e-ubuntu /bin/bash

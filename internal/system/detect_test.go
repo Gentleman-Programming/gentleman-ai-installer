@@ -40,7 +40,7 @@ func TestDetectFromInputsMarksSupportedMacOS(t *testing.T) {
 }
 
 func TestDetectFromInputsMarksUnsupportedLinuxDistro(t *testing.T) {
-	osRelease := "ID=fedora\nID_LIKE=rhel fedora\n"
+	osRelease := "ID=gentoo\n"
 	result := detectFromInputs("linux", "amd64", "/bin/bash", osRelease, nil, nil)
 
 	if result.System.Supported {
@@ -49,6 +49,23 @@ func TestDetectFromInputsMarksUnsupportedLinuxDistro(t *testing.T) {
 
 	if result.System.Profile.LinuxDistro != LinuxDistroUnknown {
 		t.Fatalf("expected unknown distro, got %q", result.System.Profile.LinuxDistro)
+	}
+}
+
+func TestDetectFromInputsMarksFedoraSupported(t *testing.T) {
+	osRelease := "ID=fedora\nVERSION_ID=43\n"
+	result := detectFromInputs("linux", "amd64", "/bin/bash", osRelease, nil, nil)
+
+	if !result.System.Supported {
+		t.Fatalf("expected fedora linux to be supported")
+	}
+
+	if result.System.Profile.LinuxDistro != LinuxDistroFedora {
+		t.Fatalf("expected fedora distro, got %q", result.System.Profile.LinuxDistro)
+	}
+
+	if result.System.Profile.PackageManager != "dnf" {
+		t.Fatalf("expected dnf package manager, got %q", result.System.Profile.PackageManager)
 	}
 }
 
@@ -130,13 +147,43 @@ func TestDetectLinuxDistroMatrix(t *testing.T) {
 			wantDistro: LinuxDistroArch,
 		},
 		{
-			name:       "fedora is unsupported",
-			osRelease:  "ID=fedora\nID_LIKE=\"rhel fedora\"\n",
-			wantDistro: LinuxDistroUnknown,
+			name:       "fedora",
+			osRelease:  "ID=fedora\nVERSION_ID=\"43\"\n",
+			wantDistro: LinuxDistroFedora,
 		},
 		{
-			name:       "centos is unsupported",
+			name:       "fedora with id_like",
+			osRelease:  "ID=fedora\nID_LIKE=\"fedora\"\n",
+			wantDistro: LinuxDistroFedora,
+		},
+		{
+			name:       "centos derivative of rhel/fedora",
 			osRelease:  "ID=centos\nID_LIKE=\"rhel fedora\"\n",
+			wantDistro: LinuxDistroFedora,
+		},
+		{
+			name:       "rhel",
+			osRelease:  "ID=rhel\nID_LIKE=\"fedora\"\n",
+			wantDistro: LinuxDistroFedora,
+		},
+		{
+			name:       "rocky linux derivative of rhel",
+			osRelease:  "ID=rocky\nID_LIKE=\"rhel centos fedora\"\n",
+			wantDistro: LinuxDistroFedora,
+		},
+		{
+			name:       "almalinux derivative of rhel",
+			osRelease:  "ID=almalinux\nID_LIKE=\"rhel centos fedora\"\n",
+			wantDistro: LinuxDistroFedora,
+		},
+		{
+			name:       "nobara derivative of fedora",
+			osRelease:  "ID=nobara\nID_LIKE=\"fedora\"\n",
+			wantDistro: LinuxDistroFedora,
+		},
+		{
+			name:       "gentoo is unsupported",
+			osRelease:  "ID=gentoo\n",
 			wantDistro: LinuxDistroUnknown,
 		},
 		{
@@ -232,9 +279,18 @@ func TestResolvePlatformProfileMatrix(t *testing.T) {
 			wantSupported: true,
 		},
 		{
-			name:          "unsupported distro profile",
+			name:          "fedora profile",
 			goos:          "linux",
 			osRelease:     "ID=fedora\n",
+			wantOS:        "linux",
+			wantPM:        "dnf",
+			wantDistro:    LinuxDistroFedora,
+			wantSupported: true,
+		},
+		{
+			name:          "unsupported distro profile",
+			goos:          "linux",
+			osRelease:     "ID=gentoo\n",
 			wantOS:        "linux",
 			wantPM:        "",
 			wantDistro:    LinuxDistroUnknown,

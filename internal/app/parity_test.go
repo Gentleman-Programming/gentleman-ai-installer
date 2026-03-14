@@ -97,13 +97,20 @@ func TestGuardAcceptsLinux(t *testing.T) {
 }
 
 func TestGuardRejectsUnsupportedLinuxDistro(t *testing.T) {
-	profile := system.PlatformProfile{OS: "linux", LinuxDistro: "fedora", Supported: false}
+	profile := system.PlatformProfile{OS: "linux", LinuxDistro: "gentoo", Supported: false}
 	err := system.EnsureSupportedPlatform(profile)
 	if err == nil {
 		t.Fatalf("expected error for unsupported linux distro")
 	}
 	if !errors.Is(err, system.ErrUnsupportedLinuxDistro) {
 		t.Fatalf("expected ErrUnsupportedLinuxDistro, got %v", err)
+	}
+}
+
+func TestGuardAcceptsFedoraProfile(t *testing.T) {
+	profile := system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroFedora, PackageManager: "dnf", Supported: true}
+	if err := system.EnsureSupportedPlatform(profile); err != nil {
+		t.Fatalf("expected fedora profile to be accepted, got %v", err)
 	}
 }
 
