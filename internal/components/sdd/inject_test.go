@@ -2,6 +2,7 @@ package sdd
 
 import (
 	"encoding/json"
+	"io/fs"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1424,6 +1425,128 @@ func TestInjectOpenCodePluginIdempotent(t *testing.T) {
 	}
 	if second.Changed {
 		t.Fatal("Inject(multi) second changed = true — plugin idempotency broken")
+	}
+}
+
+func TestCommandsAssetDir(t *testing.T) {
+	tests := []struct {
+		agentID model.AgentID
+		want    string
+	}{
+		{model.AgentClaudeCode, "claude/commands"},
+		{model.AgentOpenCode, "opencode/commands"},
+		{model.AgentCursor, ""},
+		{model.AgentGeminiCLI, ""},
+		{model.AgentVSCodeCopilot, ""},
+	}
+	for _, tt := range tests {
+		if got := commandsAssetDir(tt.agentID); got != tt.want {
+			t.Errorf("commandsAssetDir(%q) = %q, want %q", tt.agentID, got, tt.want)
+		}
+	}
+}
+
+func TestSDDCommandNames(t *testing.T) {
+	names := SDDCommandNames()
+	if len(names) != 3 {
+		t.Fatalf("SDDCommandNames() returned %d names, want 3: %v", len(names), names)
+	}
+
+	wantNames := map[string]bool{
+		"sdd-new":      true,
+		"sdd-continue": true,
+		"sdd-ff":       true,
+	}
+
+	for _, name := range names {
+		if !wantNames[name] {
+			t.Errorf("SDDCommandNames() contains unexpected name %q", name)
+		}
+	}
+
+	// Cross-check against the embedded asset files.
+	entries, err := fs.ReadDir(assets.FS, "claude/commands")
+	if err != nil {
+		t.Fatalf("fs.ReadDir(claude/commands) error = %v", err)
+	}
+	fileCount := 0
+	for _, e := range entries {
+		if !e.IsDir() {
+			fileCount++
+		}
+	}
+	if fileCount != len(names) {
+		t.Errorf("SDDCommandNames() has %d entries but claude/commands has %d files — lists are out of sync", len(names), fileCount)
+	}
+}
+
+func TestInjectClaudeWritesCommandFiles(t *testing.T) {
+	home := t.TempDir()
+
+	result, err := Inject(home, claudeAdapter(), "")
+	if err != nil {
+		t.Fatalf("Inject() error = %v", err)
+	}
+	if !result.Changed {
+		t.Fatalf("Inject() changed = false")
+	}
+
+	expectedCommands := SDDCommandNames()
+	for _, cmd := range expectedCommands {
+		path := filepath.Join(home, ".claude", "commands", cmd+".md")
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile(%s.md) error = %v", cmd, err)
+		}
+		text := string(content)
+
+		if !strings.Contains(text, "description:") {
+			t.Errorf("%s.md missing description frontmatter", cmd)
+		}
+		if strings.Contains(text, "agent:") {
+			t.Errorf("%s.md contains agent: field — should not be in Claude commands", cmd)
+		}
+		if strings.Contains(text, "subtask:") {
+			t.Errorf("%s.md contains subtask: field — should not be in Claude commands", cmd)
+		}
+	}
+
+	// Verify skill path references use Claude path, not OpenCode.
+	newPath := filepath.Join(home, ".claude", "commands", "sdd-new.md")
+	newContent, err := os.ReadFile(newPath)
+	if err != nil {
+		t.Fatalf("ReadFile(sdd-new.md) error = %v", err)
+	}
+	if strings.Contains(string(newContent), "opencode/skills") {
+		t.Fatal("sdd-new.md references opencode skills path — should use ~/.claude/skills/")
+	}
+}
+
+func TestInjectClaudeCommandsIdempotent(t *testing.T) {
+	home := t.TempDir()
+
+	first, err := Inject(home, claudeAdapter(), "")
+	if err != nil {
+		t.Fatalf("Inject() first error = %v", err)
+	}
+	if !first.Changed {
+		t.Fatalf("Inject() first changed = false")
+	}
+
+	second, err := Inject(home, claudeAdapter(), "")
+	if err != nil {
+		t.Fatalf("Inject() second error = %v", err)
+	}
+	if second.Changed {
+		t.Fatalf("Inject() second changed = true — command files changed on second run")
+	}
+
+	// Verify files are still present and unchanged.
+	for _, cmd := range SDDCommandNames() {
+		path := filepath.Join(home, ".claude", "commands", cmd+".md")
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("command file %s.md missing after second inject: %v", cmd, err)
+		}
 	}
 }
 
