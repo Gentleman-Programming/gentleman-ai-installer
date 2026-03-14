@@ -89,6 +89,24 @@ func TestDetect(t *testing.T) {
 	}
 }
 
+func TestSupportsSlashCommands(t *testing.T) {
+	a := NewAdapter()
+	if !a.SupportsSlashCommands() {
+		t.Fatal("SupportsSlashCommands() = false, want true")
+	}
+}
+
+func TestCommandsDir(t *testing.T) {
+	a := NewAdapter()
+
+	homeDir := "/home/user"
+	want := filepath.Join(homeDir, ".claude", "commands")
+	got := a.CommandsDir(homeDir)
+	if got != want {
+		t.Fatalf("CommandsDir(%q) = %q, want %q", homeDir, got, want)
+	}
+}
+
 func TestInstallCommand(t *testing.T) {
 	a := NewAdapter()
 
