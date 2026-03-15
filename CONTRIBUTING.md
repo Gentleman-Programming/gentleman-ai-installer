@@ -1,4 +1,4 @@
-# Contributing to Gentle AI
+# Contributing to Gentle AI <!-- v1.0 -->
 
 Thank you for your interest in contributing to **Gentle AI** (`gga`) — a Go TUI installer for AI agent environments.
 
