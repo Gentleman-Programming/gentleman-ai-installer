@@ -1412,6 +1412,7 @@ test_oc_sdd_multi_mode_injection() {
 
     if $BINARY install --agent opencode --component sdd --persona neutral --sdd-mode multi 2>&1; then
         local settings="$HOME/.config/opencode/opencode.json"
+        local plugin="$HOME/.config/opencode/plugins/background-agents.ts"
         assert_file_exists "$settings" "opencode.json exists"
         assert_valid_json "$settings" "opencode.json is valid JSON"
         assert_file_contains "$settings" '"sdd-orchestrator"' "Has sdd-orchestrator agent"
@@ -1425,6 +1426,12 @@ test_oc_sdd_multi_mode_injection() {
         assert_file_contains "$settings" '"sdd-tasks"' "Has sdd-tasks sub-agent"
         assert_file_contains "$settings" '"sdd-archive"' "Has sdd-archive sub-agent"
         assert_file_contains "$settings" '"subagent"' "Sub-agents have mode subagent"
+        assert_file_contains "$settings" '"delegate"' "Has delegate tool"
+        assert_file_contains "$settings" '"delegation_read"' "Has delegation_read tool"
+        assert_file_contains "$settings" '"delegation_list"' "Has delegation_list tool"
+        assert_file_exists "$plugin" "background-agents plugin exists"
+        assert_file_contains "$plugin" 'background-agents' "Plugin has expected content marker"
+        assert_file_size_min "$plugin" 1000 "Plugin file has substantial content"
     else
         log_fail "OpenCode SDD multi-mode install command failed"
     fi
@@ -1441,6 +1448,7 @@ test_oc_sdd_single_mode_no_subagents() {
         assert_file_contains "$settings" '"sdd-orchestrator"' "Has sdd-orchestrator agent"
         assert_file_not_contains "$settings" '"sdd-apply"' "Single mode: no sdd-apply sub-agent"
         assert_file_not_contains "$settings" '"subagent"' "Single mode: no subagent mode entries"
+        assert_file_not_exists "$HOME/.config/opencode/plugins/background-agents.ts" "Single mode: no background-agents plugin"
     else
         log_fail "OpenCode SDD single-mode install command failed"
     fi
@@ -1455,6 +1463,7 @@ test_oc_sdd_default_mode_same_as_single() {
         assert_file_exists "$settings" "opencode.json exists"
         assert_file_contains "$settings" '"sdd-orchestrator"' "Has sdd-orchestrator"
         assert_file_not_contains "$settings" '"sdd-apply"' "Default mode: no sdd-apply sub-agent"
+        assert_file_not_exists "$HOME/.config/opencode/plugins/background-agents.ts" "Default mode: no background-agents plugin"
     else
         log_fail "OpenCode SDD default mode install command failed"
     fi

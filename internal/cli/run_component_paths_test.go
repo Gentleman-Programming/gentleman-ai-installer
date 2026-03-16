@@ -44,6 +44,30 @@ func TestComponentPathsSDDIncludesOpenCodeSettingsAndCommands(t *testing.T) {
 	}
 }
 
+func TestComponentPathsSDDMultiIncludesOpenCodePlugin(t *testing.T) {
+	home := t.TempDir()
+	adapters := resolveAdapters([]model.AgentID{model.AgentOpenCode})
+
+	paths := componentPaths(home, model.Selection{SDDMode: model.SDDModeMulti}, adapters, model.ComponentSDD)
+
+	plugin := filepath.Join(home, ".config", "opencode", "plugins", "background-agents.ts")
+	if !containsPath(paths, plugin) {
+		t.Fatalf("componentPaths(sdd multi) missing OpenCode plugin path %q\npaths=%v", plugin, paths)
+	}
+}
+
+func TestComponentPathsSDDSingleExcludesOpenCodePlugin(t *testing.T) {
+	home := t.TempDir()
+	adapters := resolveAdapters([]model.AgentID{model.AgentOpenCode})
+
+	paths := componentPaths(home, model.Selection{SDDMode: model.SDDModeSingle}, adapters, model.ComponentSDD)
+
+	plugin := filepath.Join(home, ".config", "opencode", "plugins", "background-agents.ts")
+	if containsPath(paths, plugin) {
+		t.Fatalf("componentPaths(sdd single) unexpectedly included OpenCode plugin path %q\npaths=%v", plugin, paths)
+	}
+}
+
 func TestComponentPathsSDDIncludesSkillsAndSharedConventions(t *testing.T) {
 	home := t.TempDir()
 	adapters := resolveAdapters([]model.AgentID{model.AgentGeminiCLI})

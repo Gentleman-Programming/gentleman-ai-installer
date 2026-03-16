@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/internal/agents"
@@ -13,6 +14,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/agents/gemini"
 	"github.com/gentleman-programming/gentle-ai/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/internal/agents/vscode"
+	"github.com/gentleman-programming/gentle-ai/internal/assets"
 	"github.com/gentleman-programming/gentle-ai/internal/components/engram"
 	"github.com/gentleman-programming/gentle-ai/internal/components/mcp"
 	"github.com/gentleman-programming/gentle-ai/internal/components/persona"
@@ -139,7 +141,18 @@ func TestGoldenSDD_OpenCode_Multi(t *testing.T) {
 
 	// Golden-check the settings file with multi overlay merged.
 	settingsJSON := readTestFile(t, filepath.Join(home, ".config", "opencode", "opencode.json"))
+	for _, toolName := range []string{"\"delegate\"", "\"delegation_read\"", "\"delegation_list\""} {
+		if !strings.Contains(string(settingsJSON), toolName) {
+			t.Fatalf("multi-mode settings missing orchestrator tool %s", toolName)
+		}
+	}
 	assertGolden(t, "sdd-opencode-multi-settings.golden", settingsJSON)
+
+	pluginPath := filepath.Join(home, ".config", "opencode", "plugins", "background-agents.ts")
+	pluginContent := readTestFile(t, pluginPath)
+	if string(pluginContent) != assets.MustRead("opencode/plugins/background-agents.ts") {
+		t.Fatalf("plugin content mismatch for %q", pluginPath)
+	}
 }
 
 func TestGoldenSDD_Cursor(t *testing.T) {

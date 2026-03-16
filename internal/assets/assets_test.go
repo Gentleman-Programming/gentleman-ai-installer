@@ -17,6 +17,8 @@ func TestAllEmbeddedAssetsAreReadable(t *testing.T) {
 
 		// OpenCode agent files
 		"opencode/persona-gentleman.md",
+		"opencode/sdd-overlay-single.json",
+		"opencode/sdd-overlay-multi.json",
 		"opencode/commands/sdd-apply.md",
 		"opencode/commands/sdd-archive.md",
 		"opencode/commands/sdd-continue.md",
@@ -25,6 +27,7 @@ func TestAllEmbeddedAssetsAreReadable(t *testing.T) {
 		"opencode/commands/sdd-init.md",
 		"opencode/commands/sdd-new.md",
 		"opencode/commands/sdd-verify.md",
+		"opencode/plugins/background-agents.ts",
 
 		// SDD skills
 		"skills/sdd-init/SKILL.md",
@@ -63,6 +66,43 @@ func TestAllEmbeddedAssetsAreReadable(t *testing.T) {
 				t.Fatalf("Read(%q) content is suspiciously short (%d bytes) — possible stub", path, len(content))
 			}
 		})
+	}
+}
+
+func TestOpenCodeEmbeddedAssetLayout(t *testing.T) {
+	entries, err := FS.ReadDir("opencode")
+	if err != nil {
+		t.Fatalf("ReadDir(opencode) error = %v", err)
+	}
+
+	seen := map[string]bool{}
+	for _, entry := range entries {
+		seen[entry.Name()] = true
+	}
+
+	for _, name := range []string{"commands", "plugins", "persona-gentleman.md", "sdd-overlay-single.json", "sdd-overlay-multi.json"} {
+		if !seen[name] {
+			t.Fatalf("opencode embedded assets missing %q", name)
+		}
+	}
+
+	commandEntries, err := FS.ReadDir("opencode/commands")
+	if err != nil {
+		t.Fatalf("ReadDir(opencode/commands) error = %v", err)
+	}
+	if len(commandEntries) != 8 {
+		t.Fatalf("opencode commands count = %d, want 8", len(commandEntries))
+	}
+
+	pluginEntries, err := FS.ReadDir("opencode/plugins")
+	if err != nil {
+		t.Fatalf("ReadDir(opencode/plugins) error = %v", err)
+	}
+	if len(pluginEntries) != 1 {
+		t.Fatalf("opencode plugins count = %d, want 1", len(pluginEntries))
+	}
+	if pluginEntries[0].Name() != "background-agents.ts" {
+		t.Fatalf("plugin entry = %q, want background-agents.ts", pluginEntries[0].Name())
 	}
 }
 

@@ -1197,6 +1197,56 @@ func TestRunInstallDryRunMatchesActualInstall(t *testing.T) {
 	}
 }
 
+func TestRunInstallDryRunMatchesActualInstallOpenCodeSDDMulti(t *testing.T) {
+	installArgs := []string{"--agent", "opencode", "--component", "sdd", "--sdd-mode", "multi"}
+	dryRunArgs := append([]string{"--dry-run"}, installArgs...)
+	dryResult, err := RunInstall(dryRunArgs, system.DetectionResult{})
+	if err != nil {
+		t.Fatalf("dry-run RunInstall() error = %v", err)
+	}
+	if !dryResult.DryRun {
+		t.Fatalf("expected DryRun=true in result, got false")
+	}
+
+	home := t.TempDir()
+	adapters := resolveAdapters(dryResult.Resolved.Agents)
+	var expectedPaths []string
+	for _, component := range dryResult.Resolved.OrderedComponents {
+		expectedPaths = append(expectedPaths, componentPaths(home, dryResult.Selection, adapters, component)...)
+	}
+	pluginPath := filepath.Join(home, ".config", "opencode", "plugins", "background-agents.ts")
+	if !containsPath(expectedPaths, pluginPath) {
+		t.Fatalf("dry-run expected paths missing multi-mode plugin %q\npaths=%v", pluginPath, expectedPaths)
+	}
+
+	restoreHome := osUserHomeDir
+	restoreCommand := runCommand
+	restoreLookPath := cmdLookPath
+	t.Cleanup(func() {
+		osUserHomeDir = restoreHome
+		runCommand = restoreCommand
+		cmdLookPath = restoreLookPath
+	})
+
+	osUserHomeDir = func() (string, error) { return home, nil }
+	runCommand = func(string, ...string) error { return nil }
+	cmdLookPath = missingBinaryLookPath
+
+	realResult, err := RunInstall(installArgs, system.DetectionResult{})
+	if err != nil {
+		t.Fatalf("real RunInstall() error = %v", err)
+	}
+	if !realResult.Verify.Ready {
+		t.Fatalf("post-apply verification not ready: %#v", realResult.Verify)
+	}
+
+	for _, path := range expectedPaths {
+		if _, statErr := os.Stat(path); statErr != nil {
+			t.Fatalf("expected dry-run path %q to exist after install: %v", path, statErr)
+		}
+	}
+}
+
 func TestEnsureGoAvailableAfterInstallWindowsRefreshesPath(t *testing.T) {
 	restoreLookPath := cmdLookPath
 	restoreStat := osStat

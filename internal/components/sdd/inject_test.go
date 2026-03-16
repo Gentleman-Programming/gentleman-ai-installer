@@ -452,8 +452,23 @@ func TestInjectOpenCodeMultiMode(t *testing.T) {
 	}
 
 	// Verify orchestrator is present.
-	if _, ok := agentMap["sdd-orchestrator"]; !ok {
+	orchestratorRaw, ok := agentMap["sdd-orchestrator"]
+	if !ok {
 		t.Fatal("missing sdd-orchestrator agent")
+	}
+	orchestratorAgent, ok := orchestratorRaw.(map[string]any)
+	if !ok {
+		t.Fatalf("sdd-orchestrator has unexpected type: %T", orchestratorRaw)
+	}
+	toolsRaw, ok := orchestratorAgent["tools"].(map[string]any)
+	if !ok {
+		t.Fatalf("sdd-orchestrator tools has unexpected type: %T", orchestratorAgent["tools"])
+	}
+	for _, toolName := range []string{"delegate", "delegation_read", "delegation_list"} {
+		value, ok := toolsRaw[toolName].(bool)
+		if !ok || !value {
+			t.Fatalf("sdd-orchestrator missing multi-mode tool %q", toolName)
+		}
 	}
 
 	// Verify representative sub-agents are present.
@@ -471,6 +486,25 @@ func TestInjectOpenCodeMultiMode(t *testing.T) {
 	}
 	if mode, _ := applyAgent["mode"].(string); mode != "subagent" {
 		t.Fatalf("sdd-apply mode = %q, want %q", mode, "subagent")
+	}
+
+	pluginPath := filepath.Join(home, ".config", "opencode", "plugins", "background-agents.ts")
+	pluginContent, err := os.ReadFile(pluginPath)
+	if err != nil {
+		t.Fatalf("ReadFile(background-agents.ts) error = %v", err)
+	}
+	if string(pluginContent) != assets.MustRead("opencode/plugins/background-agents.ts") {
+		t.Fatal("background-agents.ts content does not match embedded asset")
+	}
+	foundPlugin := false
+	for _, path := range result.Files {
+		if path == pluginPath {
+			foundPlugin = true
+			break
+		}
+	}
+	if !foundPlugin {
+		t.Fatalf("plugin path %q missing from result.Files", pluginPath)
 	}
 }
 
@@ -491,6 +525,15 @@ func TestInjectOpenCodeMultiModeIdempotent(t *testing.T) {
 	}
 	if second.Changed {
 		t.Fatal("Inject(multi) second changed = true — multi overlay was duplicated")
+	}
+
+	pluginPath := filepath.Join(home, ".config", "opencode", "plugins", "background-agents.ts")
+	content, err := os.ReadFile(pluginPath)
+	if err != nil {
+		t.Fatalf("ReadFile(background-agents.ts) error = %v", err)
+	}
+	if string(content) != assets.MustRead("opencode/plugins/background-agents.ts") {
+		t.Fatal("background-agents.ts changed after second multi inject")
 	}
 }
 
