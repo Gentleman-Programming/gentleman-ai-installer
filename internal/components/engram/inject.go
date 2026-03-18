@@ -16,10 +16,10 @@ type InjectionResult struct {
 }
 
 // defaultEngramServerJSON is the MCP server config for separate-file strategy.
-var defaultEngramServerJSON = []byte("{\n  \"command\": \"engram\",\n  \"args\": []\n}\n")
+var defaultEngramServerJSON = []byte("{\n  \"command\": \"engram\",\n  \"args\": [\"mcp\"]\n}\n")
 
 // defaultEngramOverlayJSON is the settings.json overlay for merge strategy (Gemini, etc.).
-var defaultEngramOverlayJSON = []byte("{\n  \"mcpServers\": {\n    \"engram\": {\n      \"command\": \"engram\",\n      \"args\": []\n    }\n  }\n}\n")
+var defaultEngramOverlayJSON = []byte("{\n  \"mcpServers\": {\n    \"engram\": {\n      \"command\": \"engram\",\n      \"args\": [\"mcp\"]\n    }\n  }\n}\n")
 
 // openCodeEngramOverlayJSON is the opencode.json overlay using the new MCP format.
 var openCodeEngramOverlayJSON = []byte("{\n  \"mcp\": {\n    \"engram\": {\n      \"command\": [\"engram\", \"mcp\"],\n      \"enabled\": true,\n      \"type\": \"local\"\n    }\n  }\n}\n")
