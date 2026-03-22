@@ -26,16 +26,15 @@ func CanUpdateAll(results []UpdateResult, profile system.PlatformProfile) bool {
 }
 
 func ActionableResults(results []UpdateResult, profile system.PlatformProfile) []UpdateResult {
-	if profile.PackageManager != "brew" {
-		return nil
-	}
-
 	actionable := make([]UpdateResult, 0, len(results))
 	for _, result := range results {
 		if result.Status != UpdateAvailable {
 			continue
 		}
 		if result.Tool.Name == "" {
+			continue
+		}
+		if profile.PackageManager != "brew" && !canUpdateTool(result.Tool, profile) {
 			continue
 		}
 		actionable = append(actionable, result)
@@ -50,23 +49,42 @@ func CommandsForAll(results []UpdateResult, profile system.PlatformProfile) [][]
 		return nil
 	}
 
-	packages := make([]string, 0, len(actionable))
+	if profile.PackageManager == "brew" {
+		packages := make([]string, 0, len(actionable))
+		seen := make(map[string]struct{}, len(actionable))
+		for _, result := range actionable {
+			if _, ok := seen[result.Tool.Name]; ok {
+				continue
+			}
+			seen[result.Tool.Name] = struct{}{}
+			packages = append(packages, result.Tool.Name)
+		}
+
+		return [][]string{{"brew", "update-if-needed"}, append([]string{"brew", "upgrade"}, packages...)}
+	}
+
+	var commands [][]string
 	seen := make(map[string]struct{}, len(actionable))
 	for _, result := range actionable {
 		if _, ok := seen[result.Tool.Name]; ok {
 			continue
 		}
 		seen[result.Tool.Name] = struct{}{}
-		packages = append(packages, result.Tool.Name)
+
+		resolved, err := updateCommandsForTool(result.Tool, profile)
+		if err != nil {
+			continue
+		}
+		commands = append(commands, resolved...)
 	}
 
-	return [][]string{{"brew", "update-if-needed"}, append([]string{"brew", "upgrade"}, packages...)}
+	return commands
 }
 
 func ApplyAll(ctx context.Context, results []UpdateResult, profile system.PlatformProfile) error {
 	commands := CommandsForAll(results, profile)
 	if len(commands) == 0 {
-		return fmt.Errorf("update all is only available for Homebrew-managed updates")
+		return fmt.Errorf("update all is not available for the current platform selection")
 	}
 
 	for _, command := range commands {
