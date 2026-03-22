@@ -83,11 +83,8 @@ func (profileResolver) ResolveDependencyInstall(profile system.PlatformProfile, 
 		return CommandSequence{{"sudo", "pacman", "-S", "--noconfirm", dependency}}, nil
 	case "dnf":
 		return CommandSequence{{"sudo", "dnf", "install", "-y", dependency}}, nil
-	case "apt", "pacman", "dnf":
-		if err := validateGoForModuleInstall(profile); err != nil {
-			return nil, err
-		}
-		return CommandSequence{{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}}, nil
+	case "winget":
+		return CommandSequence{{"winget", "install", "--id", dependency, "-e", "--accept-source-agreements", "--accept-package-agreements"}}, nil
 	default:
 		return nil, fmt.Errorf(
 			"unsupported package manager %q for os=%q distro=%q",
