@@ -17,7 +17,7 @@ func TestCommandsForAllBrew(t *testing.T) {
 	}
 
 	got := CommandsForAll(results, system.PlatformProfile{PackageManager: "brew"})
-	want := [][]string{{"brew", "update"}, {"brew", "upgrade", "gentle-ai", "engram"}}
+	want := [][]string{{"brew", "update-if-needed"}, {"brew", "upgrade", "gentle-ai", "engram"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("CommandsForAll() = %v, want %v", got, want)
 	}
@@ -45,7 +45,7 @@ func TestApplyAllRunsCommandsSequentially(t *testing.T) {
 		t.Fatalf("ApplyAll() error = %v", err)
 	}
 
-	want := [][]string{{"brew", "update"}, {"brew", "upgrade", "engram"}}
+	want := [][]string{{"brew", "update-if-needed"}, {"brew", "upgrade", "engram"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ApplyAll() commands = %v, want %v", got, want)
 	}

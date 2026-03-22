@@ -60,7 +60,7 @@ func CommandsForAll(results []UpdateResult, profile system.PlatformProfile) [][]
 		packages = append(packages, result.Tool.Name)
 	}
 
-	return [][]string{{"brew", "update"}, append([]string{"brew", "upgrade"}, packages...)}
+	return [][]string{{"brew", "update-if-needed"}, append([]string{"brew", "upgrade"}, packages...)}
 }
 
 func ApplyAll(ctx context.Context, results []UpdateResult, profile system.PlatformProfile) error {
