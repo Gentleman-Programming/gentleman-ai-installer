@@ -52,6 +52,12 @@ type UpdateCheckResultMsg struct {
 	Results []update.UpdateResult
 }
 
+// UpdateAllDoneMsg is sent when the background update-all action completes.
+type UpdateAllDoneMsg struct {
+	Err     error
+	Results []update.UpdateResult
+}
+
 // ExecuteFunc builds and runs the installation pipeline. It receives a ProgressFunc
 // callback to emit step-level progress events, and returns the ExecutionResult.
 type ExecuteFunc func(
@@ -63,6 +69,9 @@ type ExecuteFunc func(
 
 // RestoreFunc restores a backup from a manifest.
 type RestoreFunc func(manifest backup.Manifest) error
+
+// UpdateAllFunc applies actionable updates and returns refreshed update results.
+type UpdateAllFunc func(context.Context, []update.UpdateResult, string, system.PlatformProfile) ([]update.UpdateResult, error)
 
 type Screen int
 
@@ -77,6 +86,7 @@ const (
 	ScreenDependencyTree
 	ScreenReview
 	ScreenInstalling
+	ScreenUpdating
 	ScreenModelPicker
 	ScreenComplete
 	ScreenBackups
@@ -108,6 +118,9 @@ type Model struct {
 	// RestoreFn is called to restore a backup. When nil, restore is a no-op.
 	RestoreFn RestoreFunc
 
+	// UpdateAllFn is called to apply all actionable updates.
+	UpdateAllFn UpdateAllFunc
+
 	// UpdateResults holds the results of the background update check.
 	UpdateResults []update.UpdateResult
 
@@ -116,6 +129,9 @@ type Model struct {
 
 	// pipelineRunning tracks whether the pipeline goroutine is active.
 	pipelineRunning bool
+
+	// updateRunning tracks whether the update-all goroutine is active.
+	updateRunning bool
 }
 
 func NewModel(detection system.DetectionResult, version string) Model {
@@ -158,7 +174,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Height = msg.Height
 		return m, nil
 	case TickMsg:
-		if m.Screen == ScreenInstalling && !m.Progress.Done() {
+		if (m.Screen == ScreenInstalling || m.Screen == ScreenUpdating) && !m.Progress.Done() {
 			m.SpinnerFrame = (m.SpinnerFrame + 1) % len(spinnerFrames)
 			return m, tickCmd()
 		}
@@ -172,6 +188,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case UpdateCheckResultMsg:
 		m.UpdateResults = msg.Results
 		m.UpdateCheckDone = true
+		return m, nil
+	case UpdateAllDoneMsg:
+		m.updateRunning = false
+		m.UpdateResults = msg.Results
+		m.UpdateCheckDone = true
+		if msg.Err != nil {
+			for idx := range m.Progress.Items {
+				m.Progress.Mark(idx, string(pipeline.StepStatusFailed))
+			}
+			m.Progress.AppendLog("update all failed: %s", msg.Err.Error())
+			return m, nil
+		}
+
+		for idx := range m.Progress.Items {
+			m.Progress.Mark(idx, string(pipeline.StepStatusSucceeded))
+		}
+		m.Progress.AppendLog("update all completed successfully")
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
@@ -263,7 +296,7 @@ func (m Model) View() string {
 		if m.UpdateCheckDone && update.HasUpdates(m.UpdateResults) {
 			banner = "Updates available: " + update.UpdateSummaryLine(m.UpdateResults)
 		}
-		return screens.RenderWelcome(m.Cursor, m.Version, banner)
+		return screens.RenderWelcome(m.Cursor, m.Version, banner, m.canUpdateAll())
 	case ScreenDetection:
 		return screens.RenderDetection(m.Detection, m.Cursor)
 	case ScreenAgents:
@@ -281,7 +314,9 @@ func (m Model) View() string {
 	case ScreenReview:
 		return screens.RenderReview(m.Review, m.Cursor)
 	case ScreenInstalling:
-		return screens.RenderInstalling(m.Progress.ViewModel(), spinnerFrames[m.SpinnerFrame])
+		return screens.RenderInstalling("Installing", m.Progress.ViewModel(), spinnerFrames[m.SpinnerFrame])
+	case ScreenUpdating:
+		return screens.RenderInstalling("Updating", m.Progress.ViewModel(), spinnerFrames[m.SpinnerFrame])
 	case ScreenComplete:
 		return screens.RenderComplete(screens.CompletePayload{
 			ConfiguredAgents:    len(m.Selection.Agents),
@@ -326,7 +361,7 @@ func (m Model) handleKeyPress(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "esc":
 		// Don't allow going back while pipeline is running.
-		if m.Screen == ScreenInstalling && m.pipelineRunning {
+		if (m.Screen == ScreenInstalling && m.pipelineRunning) || (m.Screen == ScreenUpdating && m.updateRunning) {
 			return m, nil
 		}
 		return m.goBack(), nil
@@ -355,6 +390,11 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 			m.setScreen(ScreenDetection)
 		case 1:
 			m.setScreen(ScreenBackups)
+		case 2:
+			if m.canUpdateAll() {
+				return m.startUpdateAll()
+			}
+			return m, tea.Quit
 		default:
 			return m, tea.Quit
 		}
@@ -475,6 +515,11 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 				m.setScreen(ScreenComplete)
 			}
 		}
+	case ScreenUpdating:
+		if m.Progress.Done() {
+			m.setScreen(ScreenWelcome)
+			return m, nil
+		}
 	case ScreenComplete:
 		return m, tea.Quit
 	case ScreenBackups:
@@ -532,6 +577,44 @@ func (m Model) startInstalling() (tea.Model, tea.Cmd) {
 
 		result := executeFn(selection, resolved, detection, onProgress)
 		return PipelineDoneMsg{Result: result}
+	})
+}
+
+func (m Model) startUpdateAll() (tea.Model, tea.Cmd) {
+	profile := m.Detection.System.Profile
+	actionable := update.ActionableResults(m.UpdateResults, profile)
+	if len(actionable) == 0 {
+		return m, nil
+	}
+
+	labels := make([]string, 0, len(actionable))
+	for _, result := range actionable {
+		labels = append(labels, result.Tool.Name)
+	}
+
+	m.setScreen(ScreenUpdating)
+	m.SpinnerFrame = 0
+	m.Progress = NewProgressState(labels)
+	m.Progress.Start(0)
+	m.Progress.AppendLog("starting update all")
+	m.updateRunning = true
+
+	updateAllFn := m.UpdateAllFn
+	if updateAllFn == nil {
+		updateAllFn = func(ctx context.Context, results []update.UpdateResult, currentVersion string, profile system.PlatformProfile) ([]update.UpdateResult, error) {
+			err := update.ApplyAll(ctx, results, profile)
+			return update.CheckAll(ctx, currentVersion, profile), err
+		}
+	}
+
+	results := append([]update.UpdateResult(nil), m.UpdateResults...)
+	version := m.Version
+
+	return m, tea.Batch(tickCmd(), func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		refreshed, err := updateAllFn(ctx, results, version, profile)
+		return UpdateAllDoneMsg{Err: err, Results: refreshed}
 	})
 }
 
@@ -596,10 +679,17 @@ func (m *Model) setScreen(next Screen) {
 	m.Cursor = 0
 }
 
+func (m Model) canUpdateAll() bool {
+	if !m.UpdateCheckDone {
+		return false
+	}
+	return update.CanUpdateAll(m.UpdateResults, m.Detection.System.Profile)
+}
+
 func (m Model) optionCount() int {
 	switch m.Screen {
 	case ScreenWelcome:
-		return len(screens.WelcomeOptions())
+		return len(screens.WelcomeOptions(m.canUpdateAll()))
 	case ScreenDetection:
 		return len(screens.DetectionOptions())
 	case ScreenAgents:
@@ -623,6 +713,8 @@ func (m Model) optionCount() int {
 	case ScreenReview:
 		return len(screens.ReviewOptions())
 	case ScreenInstalling:
+		return 1
+	case ScreenUpdating:
 		return 1
 	case ScreenComplete:
 		return 1

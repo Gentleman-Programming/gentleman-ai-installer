@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -11,6 +13,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/planner"
 	"github.com/gentleman-programming/gentle-ai/internal/system"
 	"github.com/gentleman-programming/gentle-ai/internal/tui/screens"
+	"github.com/gentleman-programming/gentle-ai/internal/update"
 )
 
 func TestNavigationWelcomeToDetection(t *testing.T) {
@@ -21,6 +24,50 @@ func TestNavigationWelcomeToDetection(t *testing.T) {
 
 	if state.Screen != ScreenDetection {
 		t.Fatalf("screen = %v, want %v", state.Screen, ScreenDetection)
+	}
+}
+
+func TestWelcomeUpdateAllStartsUpdatingFlow(t *testing.T) {
+	m := NewModel(system.DetectionResult{System: system.SystemInfo{Profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"}}}, "dev")
+	m.UpdateCheckDone = true
+	m.UpdateResults = []update.UpdateResult{{
+		Tool:             update.ToolInfo{Name: "engram"},
+		Status:           update.UpdateAvailable,
+		InstalledVersion: "1.0.0",
+		LatestVersion:    "1.1.0",
+	}}
+	m.Cursor = 2
+	m.UpdateAllFn = func(context.Context, []update.UpdateResult, string, system.PlatformProfile) ([]update.UpdateResult, error) {
+		return []update.UpdateResult{{Tool: update.ToolInfo{Name: "engram"}, Status: update.UpToDate, InstalledVersion: "1.1.0", LatestVersion: "1.1.0"}}, nil
+	}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	state := updated.(Model)
+
+	if state.Screen != ScreenUpdating {
+		t.Fatalf("screen = %v, want %v", state.Screen, ScreenUpdating)
+	}
+	if cmd == nil {
+		t.Fatal("expected update-all command")
+	}
+}
+
+func TestUpdateAllDoneReturnsToWelcomeOnEnter(t *testing.T) {
+	m := NewModel(system.DetectionResult{}, "dev")
+	m.Screen = ScreenUpdating
+	m.Progress = NewProgressState([]string{"engram"})
+
+	updated, _ := m.Update(UpdateAllDoneMsg{Results: []update.UpdateResult{{Tool: update.ToolInfo{Name: "engram"}, Status: update.UpToDate}}})
+	state := updated.(Model)
+
+	if !state.Progress.Done() {
+		t.Fatal("expected update progress to be complete")
+	}
+
+	updated, _ = state.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	state = updated.(Model)
+	if state.Screen != ScreenWelcome {
+		t.Fatalf("screen = %v, want %v", state.Screen, ScreenWelcome)
 	}
 }
 
@@ -168,7 +215,7 @@ func TestPipelineDoneMsgSurfacesFailedSteps(t *testing.T) {
 	// Verify that the error message appears in the logs.
 	found := false
 	for _, log := range state.Progress.Logs {
-		if contains(log, "skill inject: write failed") {
+		if strings.Contains(log, "skill inject: write failed") {
 			found = true
 			break
 		}
@@ -177,20 +224,6 @@ func TestPipelineDoneMsgSurfacesFailedSteps(t *testing.T) {
 		t.Fatalf("expected error detail in logs, got: %v", state.Progress.Logs)
 	}
 }
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && searchSubstring(s, substr)
-}
-
-func searchSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
 func TestInstallingScreenManualFallbackWithoutExecuteFn(t *testing.T) {
 	m := NewModel(system.DetectionResult{}, "dev")
 	m.Screen = ScreenInstalling

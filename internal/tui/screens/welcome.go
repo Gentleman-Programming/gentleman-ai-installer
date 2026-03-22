@@ -6,11 +6,15 @@ import (
 	"github.com/gentleman-programming/gentle-ai/internal/tui/styles"
 )
 
-func WelcomeOptions() []string {
-	return []string{"Start installation", "Manage backups", "Quit"}
+func WelcomeOptions(canUpdateAll bool) []string {
+	options := []string{"Start installation", "Manage backups"}
+	if canUpdateAll {
+		options = append(options, "Update all")
+	}
+	return append(options, "Quit")
 }
 
-func RenderWelcome(cursor int, version string, updateBanner string) string {
+func RenderWelcome(cursor int, version string, updateBanner string, canUpdateAll bool) string {
 	var b strings.Builder
 
 	b.WriteString(styles.RenderLogo())
@@ -26,7 +30,7 @@ func RenderWelcome(cursor int, version string, updateBanner string) string {
 	b.WriteString("\n")
 	b.WriteString(styles.HeadingStyle.Render("Menu"))
 	b.WriteString("\n\n")
-	b.WriteString(renderOptions(WelcomeOptions(), cursor))
+	b.WriteString(renderOptions(WelcomeOptions(canUpdateAll), cursor))
 	b.WriteString("\n")
 	b.WriteString(styles.HelpStyle.Render("j/k: navigate • enter: select • q: quit"))
 
