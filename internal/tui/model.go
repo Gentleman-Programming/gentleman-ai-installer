@@ -127,12 +127,6 @@ type Model struct {
 	// UpdateCheckDone is true once the background update check has completed.
 	UpdateCheckDone bool
 
-	// StatusBanner is shown on the welcome screen for update actions.
-	StatusBanner string
-
-	// StatusLevel controls the welcome banner style: success, error, or warning.
-	StatusLevel string
-
 	// pipelineRunning tracks whether the pipeline goroutine is active.
 	pipelineRunning bool
 
@@ -204,8 +198,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Progress.Mark(idx, string(pipeline.StepStatusFailed))
 			}
 			m.Progress.AppendLog("update all failed: %s", msg.Err.Error())
-			m.StatusBanner = "Update all failed."
-			m.StatusLevel = "error"
 			return m, nil
 		}
 
@@ -213,8 +205,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Progress.Mark(idx, string(pipeline.StepStatusSucceeded))
 		}
 		m.Progress.AppendLog("update all completed successfully")
-		m.StatusBanner = "Update all completed."
-		m.StatusLevel = "success"
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
@@ -306,7 +296,7 @@ func (m Model) View() string {
 		if m.UpdateCheckDone && update.HasUpdates(m.UpdateResults) {
 			banner = "Updates available: " + update.UpdateSummaryLine(m.UpdateResults)
 		}
-		return screens.RenderWelcome(m.Cursor, m.Version, m.StatusBanner, m.StatusLevel, banner, m.canUpdateAll())
+		return screens.RenderWelcome(m.Cursor, m.Version, banner, m.canUpdateAll())
 	case ScreenDetection:
 		return screens.RenderDetection(m.Detection, m.Cursor)
 	case ScreenAgents:
@@ -397,12 +387,8 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 	case ScreenWelcome:
 		switch m.Cursor {
 		case 0:
-			m.StatusBanner = ""
-			m.StatusLevel = ""
 			m.setScreen(ScreenDetection)
 		case 1:
-			m.StatusBanner = ""
-			m.StatusLevel = ""
 			m.setScreen(ScreenBackups)
 		case 2:
 			if m.canUpdateAll() {
@@ -598,8 +584,6 @@ func (m Model) startUpdateAll() (tea.Model, tea.Cmd) {
 	profile := m.Detection.System.Profile
 	actionable := update.ActionableResults(m.UpdateResults, profile)
 	if len(actionable) == 0 {
-		m.StatusBanner = "No Homebrew updates are ready to apply."
-		m.StatusLevel = "warning"
 		return m, nil
 	}
 
@@ -613,8 +597,6 @@ func (m Model) startUpdateAll() (tea.Model, tea.Cmd) {
 	m.Progress = NewProgressState(labels)
 	m.Progress.Start(0)
 	m.Progress.AppendLog("starting update all")
-	m.StatusBanner = ""
-	m.StatusLevel = ""
 	m.updateRunning = true
 
 	updateAllFn := m.UpdateAllFn

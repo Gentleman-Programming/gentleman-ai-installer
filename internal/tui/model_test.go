@@ -63,9 +63,6 @@ func TestUpdateAllDoneReturnsToWelcomeOnEnter(t *testing.T) {
 	if !state.Progress.Done() {
 		t.Fatal("expected update progress to be complete")
 	}
-	if state.StatusBanner != "Update all completed." {
-		t.Fatalf("status banner = %q", state.StatusBanner)
-	}
 
 	updated, _ = state.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	state = updated.(Model)
