@@ -56,8 +56,8 @@ func TestInstallHintNodeArch(t *testing.T) {
 func TestInstallHintNodeFedora(t *testing.T) {
 	profile := PlatformProfile{OS: "linux", PackageManager: "dnf", LinuxDistro: LinuxDistroFedora}
 	hint := installHintNode(profile)
-	if !strings.Contains(hint, "dnf") || !strings.Contains(hint, "nodejs") {
-		t.Fatalf("installHintNode(fedora) = %q", hint)
+	if !strings.Contains(hint, "rpm.nodesource.com") || !strings.Contains(hint, "dnf install -y nodejs") {
+		t.Fatalf("installHintNode(fedora) = %q, want NodeSource LTS setup + dnf install", hint)
 	}
 }
 
@@ -111,6 +111,20 @@ func TestInstallCommandsForDepNodeUbuntuHasTwoSteps(t *testing.T) {
 	cmds := InstallCommandsForDep("node", profile)
 	if len(cmds) != 2 {
 		t.Fatalf("node ubuntu commands = %d, want 2 (nodesource setup + install)", len(cmds))
+	}
+}
+
+func TestInstallCommandsForDepNodeFedoraHasTwoSteps(t *testing.T) {
+	profile := PlatformProfile{OS: "linux", PackageManager: "dnf", LinuxDistro: LinuxDistroFedora}
+	cmds := InstallCommandsForDep("node", profile)
+	if len(cmds) != 2 {
+		t.Fatalf("node fedora commands = %d, want 2 (nodesource setup + install)", len(cmds))
+	}
+	if cmds[0][0] != "bash" || !strings.Contains(cmds[0][2], "rpm.nodesource.com/setup_lts.x") {
+		t.Fatalf("node fedora step 1 = %v, want nodesource setup", cmds[0])
+	}
+	if cmds[1][0] != "sudo" || cmds[1][1] != "dnf" || cmds[1][4] != "nodejs" {
+		t.Fatalf("node fedora step 2 = %v, want sudo dnf install -y nodejs", cmds[1])
 	}
 }
 

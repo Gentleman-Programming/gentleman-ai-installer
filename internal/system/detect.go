@@ -230,12 +230,12 @@ func isArchLike(id, idLike string) bool {
 }
 
 func isFedoraLike(id, idLike string) bool {
-	if id == LinuxDistroFedora || id == "rhel" || id == "centos" || id == "rocky" || id == "almalinux" {
+	if id == LinuxDistroFedora || id == "rhel" || id == "centos" || id == "rocky" || id == "almalinux" || id == "nobara" {
 		return true
 	}
 
 	for _, token := range strings.Fields(idLike) {
-		if token == LinuxDistroFedora || token == "rhel" || token == "centos" || token == "rocky" || token == "almalinux" {
+		if token == LinuxDistroFedora || token == "rhel" || token == "centos" || token == "rocky" || token == "almalinux" || token == "nobara" {
 			return true
 		}
 	}

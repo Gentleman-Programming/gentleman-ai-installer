@@ -24,6 +24,7 @@
 - `dnf` available (standard on these distros).
 - `sudo` access for package installs.
 - `git` available.
+- Node.js installs use NodeSource LTS setup + `dnf install -y nodejs` during dependency remediation.
 
 ### All platforms
 

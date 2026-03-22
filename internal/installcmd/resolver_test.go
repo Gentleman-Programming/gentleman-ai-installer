@@ -185,6 +185,12 @@ func TestResolveAgentInstall(t *testing.T) {
 			want:    CommandSequence{{"sudo", "npm", "install", "-g", "@anthropic-ai/claude-code"}},
 		},
 		{
+			name:    "claude-code on fedora nvm skips sudo",
+			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroFedora, PackageManager: "dnf", NpmWritable: true},
+			agent:   model.AgentClaudeCode,
+			want:    CommandSequence{{"npm", "install", "-g", "@anthropic-ai/claude-code"}},
+		},
+		{
 			name:    "opencode on darwin uses official anomalyco brew tap",
 			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
 			agent:   model.AgentOpenCode,
@@ -213,6 +219,12 @@ func TestResolveAgentInstall(t *testing.T) {
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroFedora, PackageManager: "dnf"},
 			agent:   model.AgentOpenCode,
 			want:    CommandSequence{{"sudo", "npm", "install", "-g", "opencode-ai"}},
+		},
+		{
+			name:    "opencode on fedora nvm skips sudo",
+			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroFedora, PackageManager: "dnf", NpmWritable: true},
+			agent:   model.AgentOpenCode,
+			want:    CommandSequence{{"npm", "install", "-g", "opencode-ai"}},
 		},
 		{
 			name:    "claude-code on windows uses npm without sudo",

@@ -117,6 +117,11 @@ func TestInstallCommand(t *testing.T) {
 			want:    [][]string{{"sudo", "npm", "install", "-g", "opencode-ai"}},
 		},
 		{
+			name:    "fedora with writable npm skips sudo",
+			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroFedora, PackageManager: "dnf", NpmWritable: true},
+			want:    [][]string{{"npm", "install", "-g", "opencode-ai"}},
+		},
+		{
 			name:    "unsupported package manager returns error",
 			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "zypper"},
 			wantErr: true,

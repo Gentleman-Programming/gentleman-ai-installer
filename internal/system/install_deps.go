@@ -50,7 +50,7 @@ func installHintNode(profile PlatformProfile) string {
 	case profile.PackageManager == "pacman":
 		return "sudo pacman -S --noconfirm nodejs npm"
 	case profile.PackageManager == "dnf":
-		return "sudo dnf install -y nodejs npm"
+		return "curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash - && sudo dnf install -y nodejs"
 	default:
 		return "install node from https://nodejs.org/"
 	}
@@ -157,7 +157,11 @@ func installCommandsNode(profile PlatformProfile) [][]string {
 	case profile.PackageManager == "pacman":
 		return [][]string{{"sudo", "pacman", "-S", "--noconfirm", "nodejs", "npm"}}
 	case profile.PackageManager == "dnf":
-		return [][]string{{"sudo", "dnf", "install", "-y", "nodejs", "npm"}}
+		// Use NodeSource LTS on Fedora/RHEL family for parity with apt-based LTS behavior.
+		return [][]string{
+			{"bash", "-c", "curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -"},
+			{"sudo", "dnf", "install", "-y", "nodejs"},
+		}
 	default:
 		return nil
 	}

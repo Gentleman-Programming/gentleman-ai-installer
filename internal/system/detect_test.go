@@ -159,6 +159,16 @@ func TestDetectLinuxDistroMatrix(t *testing.T) {
 			wantDistro: LinuxDistroFedora,
 		},
 		{
+			name:       "nobara",
+			osRelease:  "ID=nobara\nID_LIKE=\"fedora\"\n",
+			wantDistro: LinuxDistroFedora,
+		},
+		{
+			name:       "nobara via id_like token",
+			osRelease:  "ID=custom-linux\nID_LIKE=\"nobara\"\n",
+			wantDistro: LinuxDistroFedora,
+		},
+		{
 			name:       "empty os-release",
 			osRelease:  "",
 			wantDistro: LinuxDistroUnknown,
