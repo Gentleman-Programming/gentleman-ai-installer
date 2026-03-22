@@ -21,10 +21,10 @@ type InstallProgress struct {
 	Failed      bool
 }
 
-func RenderInstalling(progress InstallProgress, spinner string) string {
+func RenderInstalling(title string, progress InstallProgress, spinner string) string {
 	var b strings.Builder
 
-	b.WriteString(styles.TitleStyle.Render("Installing"))
+	b.WriteString(styles.TitleStyle.Render(title))
 	b.WriteString("\n\n")
 	b.WriteString(renderBar(progress.Percent))
 	b.WriteString(" ")
